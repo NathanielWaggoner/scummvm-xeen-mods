@@ -180,9 +180,20 @@ void Character::giveStarterKit() {
 	static const int *const WEAPON_SETS[] = { MELEE, MISSILE };
 	static const int *const ARMOR_SETS[] = { BODY, SHIELD, HELM, BOOTS, GAUNTLETS };
 
-	// Items go into free backpack slots, so anything already carried is kept
+	// Each set covers one equipment slot. A set is skipped if the character already has
+	// something for that slot, and items go into free backpack slots, so anything
+	// already carried is kept
 	for (uint setIdx = 0; setIdx < ARRAYSIZE(WEAPON_SETS); ++setIdx) {
-		for (const int *id = WEAPON_SETS[setIdx]; *id; ++id) {
+		// The second weapon set is missile weapons, which have ids 30 to 33
+		const bool wantMissile = setIdx == 1;
+		bool hasOne = false;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
+			const int id = _weapons[idx]._id;
+			if (id && (id >= 30 && id <= 33) == wantMissile)
+				hasOne = true;
+		}
+
+		for (const int *id = WEAPON_SETS[setIdx]; *id && !hasOne; ++id) {
 			if (_weapons.passRestrictions(*id, true)) {
 				if (!_weapons.isFull()) {
 					_weapons[INV_ITEMS_TOTAL - 1].clear();
@@ -195,7 +206,17 @@ void Character::giveStarterKit() {
 	}
 
 	for (uint setIdx = 0; setIdx < ARRAYSIZE(ARMOR_SETS); ++setIdx) {
-		for (const int *id = ARMOR_SETS[setIdx]; *id; ++id) {
+		// Body armor is ids 1 to 7. The other sets are a single kind of item each
+		const bool wantBody = setIdx == 0;
+		const int wantId = ARMOR_SETS[setIdx][0];
+		bool hasOne = false;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
+			const int id = _armor[idx]._id;
+			if (id && (wantBody ? id <= 7 : id == wantId))
+				hasOne = true;
+		}
+
+		for (const int *id = ARMOR_SETS[setIdx]; *id && !hasOne; ++id) {
 			if (_armor.passRestrictions(*id, true)) {
 				if (!_armor.isFull()) {
 					_armor[INV_ITEMS_TOTAL - 1].clear();

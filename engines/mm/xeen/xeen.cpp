@@ -310,8 +310,8 @@ void XeenEngine::play() {
 
 		if (ConfMan.hasKey("SaveToolMode")) {
 			// Maintenance aid, run from the command line against one save slot: reports
-			// what the party is carrying and, in "givekit" mode, gives a starter kit to
-			// every member without a weapon and writes the save back
+			// what the party is carrying and, in "givekit" mode, tops up the named member
+			// (or every member) with the starter kit pieces they lack and writes the save back
 			const bool giveKit = ConfMan.get("SaveToolMode") == "givekit";
 			for (uint idx = 0; idx < _party->_activeParty.size(); ++idx) {
 				Character &c = _party->_activeParty[idx];
@@ -322,12 +322,21 @@ void XeenEngine::play() {
 						counts[cat] += c._items[(ItemCategory)cat][i].empty() ? 0 : 1;
 				}
 
-				const bool given = giveKit && !counts[CATEGORY_WEAPON];
+				const bool given = giveKit && (!ConfMan.hasKey("SaveToolName")
+					|| c._name.equalsIgnoreCase(ConfMan.get("SaveToolName")));
 				if (given)
 					c.giveStarterKit();
-				debug("Save tool: %s (%s, level %d, exp %u): %d weapons, %d armor, %d accessories, %d misc%s",
+
+				Common::String items;
+				for (int i = 0; i < INV_ITEMS_TOTAL && !c._weapons[i].empty(); ++i)
+					items += Common::String::format("%s%s/ ", Res.WEAPON_NAMES[c._weapons[i]._id],
+						c._weapons[i]._frame ? "(worn) " : "");
+				for (int i = 0; i < INV_ITEMS_TOTAL && !c._armor[i].empty(); ++i)
+					items += Common::String::format("%s%s/ ", Res.ARMOR_NAMES[c._armor[i]._id],
+						c._armor[i]._frame ? "(worn) " : "");
+				debug("Save tool: %s (%s, level %d, exp %u)%s: %s[%d accessories, %d misc]",
 					c._name.c_str(), Res.CLASS_NAMES[c._class], c._level._permanent, c._experience,
-					counts[0], counts[1], counts[2], counts[3], given ? " -> kit given" : "");
+					given ? " kit topped up" : "", items.c_str(), counts[2], counts[3]);
 			}
 
 			if (giveKit) {
