@@ -31,7 +31,12 @@
 namespace MM {
 namespace Xeen {
 
-#define INV_ITEMS_TOTAL 9
+// Backpack slots per item category. The original game had 9, which is still how many
+// the items dialog shows at once, and how many of each category a shop stocks
+#define INV_PAGE_SIZE 9
+#define INV_PAGES 4
+#define INV_ITEMS_TOTAL (INV_PAGE_SIZE * INV_PAGES)
+#define SHOP_ITEMS_TOTAL 9
 
 class XeenEngine;
 class Character;
@@ -218,6 +223,12 @@ public:
 	 * @param suppressError	If true, no dialog is shown if the item doesn't pass restrictions
 	 */
 	bool passRestrictions(int itemId, bool suppressError = false) const;
+
+	/**
+	 * Returns how many backpack slots are in use per category: the original nine,
+	 * or all of them with the large backpack option
+	 */
+	static int capacity();
 
 	/**
 	 * Return the bare name of a given inventory item

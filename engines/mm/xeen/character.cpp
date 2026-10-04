@@ -165,6 +165,70 @@ Character &Character::operator=(const Character &src) {
 	return *this;
 }
 
+void Character::giveStarterKit() {
+	// Candidates for each piece of kit, best first. The first one the character's
+	// class is allowed to use is given, and nothing if there's none
+	static const int MELEE[] = { 1 /* long sword */, 13 /* mace */, 24 /* staff */,
+		12 /* dagger */, 7 /* club */, 0 };
+	static const int MISSILE[] = { 30 /* short bow */, 33 /* sling */, 0 };
+	static const int BODY[] = { 3 /* ring mail */, 2 /* scale armor */, 1 /* robes */, 0 };
+	static const int SHIELD[] = { 8, 0 };
+	static const int HELM[] = { 9, 0 };
+	static const int BOOTS[] = { 10, 0 };
+	static const int GAUNTLETS[] = { 13, 0 };
+
+	static const int *const WEAPON_SETS[] = { MELEE, MISSILE };
+	static const int *const ARMOR_SETS[] = { BODY, SHIELD, HELM, BOOTS, GAUNTLETS };
+
+	// Each set covers one equipment slot. A set is skipped if the character already has
+	// something for that slot, and items go into free backpack slots, so anything
+	// already carried is kept
+	for (uint setIdx = 0; setIdx < ARRAYSIZE(WEAPON_SETS); ++setIdx) {
+		// The second weapon set is missile weapons, which have ids 30 to 33
+		const bool wantMissile = setIdx == 1;
+		bool hasOne = false;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
+			const int id = _weapons[idx]._id;
+			if (id && (id >= 30 && id <= 33) == wantMissile)
+				hasOne = true;
+		}
+
+		for (const int *id = WEAPON_SETS[setIdx]; *id && !hasOne; ++id) {
+			if (_weapons.passRestrictions(*id, true)) {
+				if (!_weapons.isFull()) {
+					_weapons[InventoryItems::capacity() - 1].clear();
+					_weapons[InventoryItems::capacity() - 1]._id = *id;
+					_weapons.sort();
+				}
+				break;
+			}
+		}
+	}
+
+	for (uint setIdx = 0; setIdx < ARRAYSIZE(ARMOR_SETS); ++setIdx) {
+		// Body armor is ids 1 to 7. The other sets are a single kind of item each
+		const bool wantBody = setIdx == 0;
+		const int wantId = ARMOR_SETS[setIdx][0];
+		bool hasOne = false;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
+			const int id = _armor[idx]._id;
+			if (id && (wantBody ? id <= 7 : id == wantId))
+				hasOne = true;
+		}
+
+		for (const int *id = ARMOR_SETS[setIdx]; *id && !hasOne; ++id) {
+			if (_armor.passRestrictions(*id, true)) {
+				if (!_armor.isFull()) {
+					_armor[InventoryItems::capacity() - 1].clear();
+					_armor[InventoryItems::capacity() - 1]._id = *id;
+					_armor.sort();
+				}
+				break;
+			}
+		}
+	}
+}
+
 void Character::synchronize(Common::Serializer &s) {
 	char name[16];
 	Common::fill(&name[0], &name[16], '\0');

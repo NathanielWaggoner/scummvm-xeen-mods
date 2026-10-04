@@ -223,6 +223,14 @@ private:
 	bool _dirFlag;
 	int _windowIndex;
 	bool _redrawDone;
+	bool _skipDamage;		// Set for a script that searches a vat or cauldron, with safe cauldrons on
+
+	/**
+	 * Summarises what the rest of the script being run would give or do to the party,
+	 * by reading ahead through its remaining lines. Scripts can branch, so this lists
+	 * everything that might happen rather than what definitely will
+	 */
+	Common::String describeOutcome(bool includeDamage) const;
 	MazeEvent *_event;
 	Common::Point _currentPos;
 	Common::Stack<StackEntry> _stack;

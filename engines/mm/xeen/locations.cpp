@@ -1184,6 +1184,26 @@ Common::String TempleLocation::createLocationText(Character &ch) {
 		XeenEngine::printMil(party._gold).c_str());
 }
 
+void TempleLocation::healCharacter(Character &c) {
+	c._magicResistance._temporary = 0;
+	c._energyResistance._temporary = 0;
+	c._poisonResistance._temporary = 0;
+	c._electricityResistance._temporary = 0;
+	c._coldResistance._temporary = 0;
+	c._fireResistance._temporary = 0;
+	c._ACTemp = 0;
+	c._level._temporary = 0;
+	c._luck._temporary = 0;
+	c._accuracy._temporary = 0;
+	c._speed._temporary = 0;
+	c._endurance._temporary = 0;
+	c._personality._temporary = 0;
+	c._intellect._temporary = 0;
+	c._might._temporary = 0;
+	c._currentHp = c.getMaxHP();
+	Common::fill(&c._conditions[HEART_BROKEN], &c._conditions[NO_CONDITION], 0);
+}
+
 Character *TempleLocation::doOptions(Character *c) {
 	Interface &intf = *g_vm->_interface;
 	Party &party = *g_vm->_party;
@@ -1230,24 +1250,34 @@ Character *TempleLocation::doOptions(Character *c) {
 		}
 	} else if (Res.KeyConstants.Locations.KEY_HEAL == _buttonValue) {
 		if (_healCost && party.subtract(CONS_GOLD, _healCost, WHERE_PARTY, WT_LOC_WAIT)) {
-			c->_magicResistance._temporary = 0;
-			c->_energyResistance._temporary = 0;
-			c->_poisonResistance._temporary = 0;
-			c->_electricityResistance._temporary = 0;
-			c->_coldResistance._temporary = 0;
-			c->_fireResistance._temporary = 0;
-			c->_ACTemp = 0;
-			c->_level._temporary = 0;
-			c->_luck._temporary = 0;
-			c->_accuracy._temporary = 0;
-			c->_speed._temporary = 0;
-			c->_endurance._temporary = 0;
-			c->_personality._temporary = 0;
-			c->_intellect._temporary = 0;
-			c->_might._temporary = 0;
-			c->_currentHp = c->getMaxHP();
-			Common::fill(&c->_conditions[HEART_BROKEN], &c->_conditions[NO_CONDITION], 0);
+			healCharacter(*c);
 
+			_farewellTime = 1440;
+			intf.drawParty(true);
+			sound.stopSound();
+			sound.playSound("ahh.voc", 1);
+		}
+	} else if (Common::KEYCODE_a == _buttonValue && g_vm->_extOptions._templeHealAll) {
+		// Heal everyone who needs it, for as long as the gold lasts
+		bool healedAny = false;
+		for (uint idx = 0; idx < party._activeParty.size(); ++idx) {
+			Character &member = party._activeParty[idx];
+			createLocationText(member);
+
+			if (_healCost && party._gold >= (uint)_healCost) {
+				party._gold -= _healCost;
+				healCharacter(member);
+				healedAny = true;
+			}
+		}
+
+		// Put the costs back to those of the character being shown
+		createLocationText(*c);
+#ifdef USE_TTS
+		_resetText = true;
+#endif
+
+		if (healedAny) {
 			_farewellTime = 1440;
 			intf.drawParty(true);
 			sound.stopSound();
@@ -1409,6 +1439,20 @@ Character *TrainingLocation::doOptions(Character *c) {
 				c->_experience -=  c->nextExperienceLevel() -
 					(c->getCurrentExperience() - c->_experience);
 				c->_level._permanent++;
+
+				// Carry on through any further levels the character has the experience
+				// and the party has the gold for, rather than needing a press for each
+				while (g_vm->_extOptions._bulkTraining && !c->experienceToNextLevel()
+						&& c->_level._permanent < maxLevel()) {
+					uint cost = c->_level._permanent * c->_level._permanent * 10;
+					if (party._gold < cost)
+						break;
+
+					party._gold -= cost;
+					c->_experience -=  c->nextExperienceLevel() -
+						(c->getCurrentExperience() - c->_experience);
+					c->_level._permanent++;
+				}
 
 				if (!_charsTrained[_charIndex]) {
 					party.addTime(1440);
@@ -2758,6 +2802,15 @@ bool LocationMessage::execute(int portrait, const Common::String &name, const Co
 			return false;
 		}
 
+		// With the space-confirms option the space bar and Enter answer yes. A click on
+		// the scene is reported as the space bar, so that has to be switched off while
+		// an actual question is showing, or a stray click would answer it
+		const bool spaceConfirms = g_vm->_extOptions._spaceConfirms && !msgEnd && !confirm;
+		if (spaceConfirms)
+			_waitBounds = Common::Rect();
+		else
+			setWaitBounds();
+
 		do {
 			events.clearEvents();
 			clearEvents();
@@ -2781,7 +2834,8 @@ bool LocationMessage::execute(int portrait, const Common::String &name, const Co
 			if (confirm || _buttonValue == Common::KEYCODE_ESCAPE ||
 					_buttonValue == Common::KEYCODE_n)
 				result = 0;
-			else if (_buttonValue == Common::KEYCODE_y)
+			else if (_buttonValue == Common::KEYCODE_y || (spaceConfirms
+					&& (_buttonValue == Common::KEYCODE_SPACE || _buttonValue == Common::KEYCODE_RETURN)))
 				result = 1;
 		} while (result == -1);
 

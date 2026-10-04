@@ -25,6 +25,8 @@
 #include "common/events.h"
 #include "engines/util.h"
 #include "mm/xeen/xeen.h"
+#include "mm/xeen/locations.h"
+#include "mm/xeen/dialogs/dialogs_create_char.h"
 #include "mm/xeen/files.h"
 #include "mm/xeen/resources.h"
 
@@ -179,6 +181,34 @@ void XeenEngine::loadSettings() {
 	_extOptions._showItemCosts = ConfMan.hasKey("ShowItemCosts") && ConfMan.getBool("ShowItemCosts");
 	_extOptions._durableArmor = ConfMan.hasKey("DurableArmor") && ConfMan.getBool("DurableArmor");
 	_extOptions._showHpSpBars = ConfMan.hasKey("ShowHpSpBars") && ConfMan.getBool("ShowHpSpBars");
+	_extOptions._realTime = ConfMan.hasKey("RealTime") && ConfMan.getBool("RealTime");
+	if (ConfMan.hasKey("RealTimeExploreMs"))
+		_extOptions._rtExploreMs = MAX(ConfMan.getInt("RealTimeExploreMs"), 250);
+	if (ConfMan.hasKey("RealTimeCombatMs"))
+		_extOptions._rtCombatMs = MAX(ConfMan.getInt("RealTimeCombatMs"), 250);
+
+	// Each mod has its own setting. Configurations from before they were split up
+	// had a single QualityOfLife setting, which stands in for any that are missing
+	const bool legacy = ConfMan.hasKey("QualityOfLife") && ConfMan.getBool("QualityOfLife");
+	struct { const char *_key; bool *_option; } const MODS[] = {
+		{ "LargeBackpack", &_extOptions._largeBackpack },
+		{ "BulkTraining", &_extOptions._bulkTraining },
+		{ "TempleHealAll", &_extOptions._templeHealAll },
+		{ "LevelUpMarker", &_extOptions._levelUpMarker },
+		{ "ItemStats", &_extOptions._itemStats },
+		{ "SpaceConfirms", &_extOptions._spaceConfirms },
+		{ "TabSwitchesCharacter", &_extOptions._tabSwitchesChar },
+		{ "MapNotes", &_extOptions._mapNotes },
+		{ "MapZoom", &_extOptions._mapZoom },
+		{ "AutoPlay", &_extOptions._autoPlay },
+		{ "SafeCauldrons", &_extOptions._safeCauldrons },
+		{ "SearchPreview", &_extOptions._searchPreview }
+	};
+	for (uint idx = 0; idx < ARRAYSIZE(MODS); ++idx)
+		*MODS[idx]._option = ConfMan.hasKey(MODS[idx]._key) ? ConfMan.getBool(MODS[idx]._key) : legacy;
+
+	_extOptions._maxStartStats = ConfMan.hasKey("MaxStartStats") && ConfMan.getBool("MaxStartStats");
+	_extOptions._starterKit = ConfMan.hasKey("StarterKit") && ConfMan.getBool("StarterKit");
 
 	// If requested, load a savegame instead of showing the intro
 	if (ConfMan.hasKey("save_slot")) {
@@ -199,6 +229,12 @@ void XeenEngine::outerGameLoop() {
 	if (_loadSaveSlot != -1)
 		// Loading savegame from launcher, so Skip menu and go straight to game
 		_gameMode = GMODE_PLAY_GAME;
+
+	if (_loadSaveSlot == -1 && ConfMan.hasKey("QuickStart") && ConfMan.getBool("QuickStart")) {
+		// Testing aid: skip the intro and menus and drop straight into a new game
+		_saves->newGame();
+		_gameMode = GMODE_PLAY_GAME;
+	}
 
 	while (!shouldQuit() && _gameMode != GMODE_QUIT) {
 		GameMode mode = _gameMode;
@@ -279,9 +315,115 @@ void XeenEngine::play() {
 
 	_map->clearMaze();
 	if (_loadSaveSlot >= 0) {
+		const int slot = _loadSaveSlot;
 		_saves->newGame();
 		_saves->loadGameState(_loadSaveSlot);
 		_loadSaveSlot = -1;
+
+		if (ConfMan.hasKey("SaveToolMode")) {
+			// Maintenance aid, run from the command line against one save slot: reports
+			// what the party is carrying and, in "givekit" mode, tops up the named member
+			// (or every member) with the starter kit pieces they lack and writes the save back
+			const bool giveKit = ConfMan.get("SaveToolMode") == "givekit";
+			for (uint idx = 0; idx < _party->_activeParty.size(); ++idx) {
+				Character &c = _party->_activeParty[idx];
+				int counts[4];
+				for (int cat = 0; cat < 4; ++cat) {
+					counts[cat] = 0;
+					for (int i = 0; i < INV_ITEMS_TOTAL; ++i)
+						counts[cat] += c._items[(ItemCategory)cat][i].empty() ? 0 : 1;
+				}
+
+				const bool given = giveKit && (!ConfMan.hasKey("SaveToolName")
+					|| c._name.equalsIgnoreCase(ConfMan.get("SaveToolName")));
+				if (given)
+					c.giveStarterKit();
+
+				Common::String items;
+				for (int i = 0; i < INV_ITEMS_TOTAL && !c._weapons[i].empty(); ++i)
+					items += Common::String::format("%s%s/ ", Res.WEAPON_NAMES[c._weapons[i]._id],
+						c._weapons[i]._frame ? "(worn) " : "");
+				for (int i = 0; i < INV_ITEMS_TOTAL && !c._armor[i].empty(); ++i)
+					items += Common::String::format("%s%s/ ", Res.ARMOR_NAMES[c._armor[i]._id],
+						c._armor[i]._frame ? "(worn) " : "");
+				debug("Save tool: %s (%s, level %d, exp %u)%s: %s[%d accessories, %d misc]",
+					c._name.c_str(), Res.CLASS_NAMES[c._class], c._level._permanent, c._experience,
+					given ? " kit topped up" : "", items.c_str(), counts[2], counts[3]);
+			}
+
+			for (uint idx = 0; idx < _party->_mapNotes.size(); ++idx) {
+				const MapNote &note = _party->_mapNotes[idx];
+				debug("Save tool: map note in maze %d at %d, %d: %s", note._mazeId,
+					note._pos.x, note._pos.y, note._text.c_str());
+			}
+
+			if (ConfMan.get("SaveToolMode") == "events") {
+				// Lists the scripts on the current map that mention a word, in full
+				Common::String word = ConfMan.get("SaveToolName");
+				word.toLowercase();
+				MazeEvents &events = _map->_events;
+				debug("Save tool: map %d (%s), party at %d, %d, %u events, %u texts", _party->_mazeId,
+					_map->_mazeName.c_str(), _party->_mazePosition.x, _party->_mazePosition.y,
+					events.size(), events._text.size());
+
+				Common::Array<Common::Point> spots;
+				for (uint idx = 0; idx < events._text.size() && word == "all"; ++idx)
+					debug("Save tool: text %u: %s", idx, events._text[idx].c_str());
+
+				for (uint idx = 0; idx < events.size(); ++idx) {
+					const MazeEvent &e = events[idx];
+					if (word == "all") {
+						if (Common::find(spots.begin(), spots.end(), e._position) == spots.end())
+							spots.push_back(e._position);
+						continue;
+					}
+
+					bool isText = e._opcode == OP_Display0x01 || e._opcode == OP_DoorTextSml
+						|| e._opcode == OP_DoorTextLrg || e._opcode == OP_SignText || e._opcode == OP_NPC
+						|| e._opcode == OP_DisplayStat || e._opcode == OP_DisplayBottom
+						|| e._opcode == OP_DisplayLarge || e._opcode == OP_DisplayMain
+						|| e._opcode == OP_WhoWill || e._opcode == OP_DisplayBottomTwoLines;
+					if (!isText || e._parameters.empty())
+						continue;
+
+					for (uint p = 0; p < e._parameters.size(); ++p) {
+						if (e._parameters[p] >= events._text.size())
+							continue;
+						Common::String text = events._text[e._parameters[p]];
+						text.toLowercase();
+						if (text.contains(word) && Common::find(spots.begin(), spots.end(), e._position) == spots.end())
+							spots.push_back(e._position);
+					}
+				}
+
+				for (uint spot = 0; spot < spots.size(); ++spot) {
+					debug("Save tool: --- script at %d, %d", spots[spot].x, spots[spot].y);
+					for (uint idx = 0; idx < events.size(); ++idx) {
+						const MazeEvent &e = events[idx];
+						if (e._position != spots[spot])
+							continue;
+
+						Common::String params;
+						for (uint p = 0; p < e._parameters.size(); ++p)
+							params += Common::String::format("%d ", e._parameters[p]);
+						Common::String text;
+						if (!e._parameters.empty() && e._parameters[0] < events._text.size()
+								&& (e._opcode <= OP_NPC || e._opcode == OP_WhoWill || e._opcode >= OP_DisplayStat))
+							text = events._text[e._parameters[0]];
+						debug("Save tool:   dir %d line %2d op 0x%02x [%s] %s", e._direction, e._line,
+							(int)e._opcode, params.c_str(), text.c_str());
+					}
+				}
+			}
+
+			if (giveKit) {
+				Common::Error err = _saves->saveGameState(slot, ConfMan.get("SaveToolDesc"), slot == 0);
+				debug("Save tool: slot %d written, result %d", slot, (int)err.getCode());
+			}
+
+			quitGame();
+			return;
+		}
 	} else {
 		_map->load(_party->_mazeId);
 	}
@@ -304,7 +446,141 @@ void XeenEngine::play() {
 
 	_combat->_moveMonsters = true;
 
+	if (ConfMan.hasKey("TestBackpack") && ConfMan.getBool("TestBackpack")) {
+		// Testing aid: overfill a backpack and check that it survives a save and reload
+		Character &c = _party->_activeParty[0];
+		if (c._weapons[0].empty())
+			c._weapons[0]._id = 1;
+		for (int idx = 1; idx < 20; ++idx)
+			c._weapons[idx] = c._weapons[0];
+
+		_saves->saveGameState(98, "Backpack test");
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			c._weapons[idx].clear();
+		_saves->loadGameState(98);
+
+		int count = 0;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
+		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
+	if (ConfMan.hasKey("TestTeleportX") && ConfMan.hasKey("TestTeleportY")) {
+		// Testing aid: start from a given tile of the loaded map
+		_party->_mazePosition = Common::Point(ConfMan.getInt("TestTeleportX"), ConfMan.getInt("TestTeleportY"));
+	}
+
+	if (ConfMan.hasKey("TestAutoSpells") && ConfMan.getBool("TestAutoSpells")) {
+		// Testing aid: ready an attack spell, with points to cast it, for every
+		// character whose class has one
+		for (uint idx = 0; idx < _party->_activeParty.size(); ++idx) {
+			Character &c = _party->_activeParty[idx];
+			int category = c.getSpellsCategory();
+			if (category < 0 || category > 2)
+				continue;
+
+			for (int spellIdx = 0; spellIdx < SPELLS_PER_CLASS; ++spellIdx) {
+				if (Spells::isAttackSpell((MagicSpell)Res.SPELLS_ALLOWED[category][spellIdx])) {
+					c._spells[spellIdx] = true;
+					c._hasSpells = true;
+					c._currentSpell = spellIdx;
+					c._currentSp = 200;
+					debug("Auto spells test: %s readies spell %d", c._name.c_str(),
+						(int)Res.SPELLS_ALLOWED[category][spellIdx]);
+					break;
+				}
+			}
+		}
+	}
+
+	if (ConfMan.hasKey("TestNotes") && ConfMan.getBool("TestNotes")) {
+		// Testing aid: check that map notes survive a save and reload, then leave the
+		// game running so the map screen can be tried, reporting the notes on exit
+		static const int OFFSETS[4][2] = { { 1, 2 }, { 8, 9 }, { -3, -3 }, { 0, 11 } };
+		static const char *const TEXTS[4] = { "Saved note", "Right edge", "Left edge",
+			"A long note of thirty letters!" };
+		for (int idx = 0; idx < 4; ++idx) {
+			Common::Point pt = _party->_mazePosition + Common::Point(OFFSETS[idx][0], OFFSETS[idx][1]);
+			int mazeId = _map->mazeIdAt(pt);
+			if (mazeId)
+				_party->_mapNotes.push_back(MapNote(mazeId, _map->_loadCcNum, pt, TEXTS[idx]));
+		}
+		_saves->saveGameState(97, "Notes test");
+		_party->_mapNotes.clear();
+		_saves->loadGameState(97);
+		debug("Notes test: %u notes after reload, first is '%s'", _party->_mapNotes.size(),
+			_party->_mapNotes.empty() ? "" : _party->_mapNotes[0]._text.c_str());
+	}
+
+	if (ConfMan.hasKey("TestKit") && ConfMan.getBool("TestKit")) {
+		// Testing aid: report the starter kit each class would be given
+		for (int cls = CLASS_KNIGHT; cls <= CLASS_RANGER; ++cls) {
+			Character c;
+			c._class = (CharacterClass)cls;
+			c.giveStarterKit();
+
+			Common::String kit;
+			for (int idx = 0; idx < INV_PAGE_SIZE && !c._weapons[idx].empty(); ++idx)
+				kit += Common::String::format("%s/ ", Res.WEAPON_NAMES[c._weapons[idx]._id]);
+			for (int idx = 0; idx < INV_PAGE_SIZE && !c._armor[idx].empty(); ++idx)
+				kit += Common::String::format("%s/ ", Res.ARMOR_NAMES[c._armor[idx]._id]);
+			debug("Kit test: %s: %s", Res.CLASS_NAMES[cls], kit.c_str());
+		}
+	}
+
+	if (ConfMan.hasKey("TestCreateChar") && ConfMan.getBool("TestCreateChar")) {
+		// Testing aid: go straight to the character creation screen
+		CreateCharacterDialog::show(this);
+	}
+
+	if (ConfMan.hasKey("TestSell") && ConfMan.getBool("TestSell")) {
+		// Testing aid: open the blacksmith and report what was sold during the visit
+		Character &c = _party->_activeParty[0];
+		int weapons = 0;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			weapons += c._weapons[idx].empty() ? 0 : 1;
+		debug("Sell test: %d weapons, gold %u before", weapons, _party->_gold);
+
+		_locations->doAction(BLACKSMITH);
+
+		weapons = 0;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			weapons += c._weapons[idx].empty() ? 0 : 1;
+		debug("Sell test: %d weapons, gold %u after", weapons, _party->_gold);
+	}
+
+	if (ConfMan.hasKey("TestQoL") && ConfMan.getBool("TestQoL")) {
+		// Testing aid: visit the temple and training grounds with a rich, experienced,
+		// injured party, and report what a visit to each achieved
+		Character &c = _party->_activeParty[0];
+		c._experience += 2000000;
+		_party->_gold = 1000000;
+		for (uint idx = 1; idx < _party->_activeParty.size(); ++idx)
+			_party->_activeParty[idx]._currentHp = 1;
+		_interface->drawParty(true);
+
+		_locations->doAction(TEMPLE);
+		int healed = 0;
+		for (uint idx = 1; idx < _party->_activeParty.size(); ++idx)
+			healed += _party->_activeParty[idx]._currentHp == _party->_activeParty[idx].getMaxHP() ? 1 : 0;
+		debug("QoL test: %d of %u injured characters healed, gold %u", healed,
+			_party->_activeParty.size() - 1, _party->_gold);
+
+		if (!shouldExit()) {
+			debug("QoL test: level %d before training", c._level._permanent);
+			_locations->doAction(TRAINING);
+			debug("QoL test: level %d after training, gold %u", c._level._permanent, _party->_gold);
+		}
+	}
+
 	gameLoop();
+
+	if (ConfMan.hasKey("TestNotes") && ConfMan.getBool("TestNotes")) {
+		for (uint idx = 0; idx < _party->_mapNotes.size(); ++idx)
+			debug("Notes test: on exit, note at %d, %d: %s", _party->_mapNotes[idx]._pos.x,
+				_party->_mapNotes[idx]._pos.y, _party->_mapNotes[idx]._text.c_str());
+		debug("Notes test: party at %d, %d", _party->_mazePosition.x, _party->_mazePosition.y);
+	}
 
 	if (_party->_dead)
 		death();

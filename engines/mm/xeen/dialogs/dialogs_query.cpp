@@ -81,7 +81,9 @@ bool Confirm::execute(const Common::String &msg, int mode) {
 				|| _buttonValue == Common::KEYCODE_n)
 			break;
 
-		if (_buttonValue == Common::KEYCODE_y) {
+		// With the space-confirms option, the space bar and Enter also mean yes
+		if (_buttonValue == Common::KEYCODE_y || (g_vm->_extOptions._spaceConfirms
+				&& (_buttonValue == Common::KEYCODE_SPACE || _buttonValue == Common::KEYCODE_RETURN))) {
 			result = true;
 			break;
 		}
@@ -115,7 +117,12 @@ bool YesNo::execute(bool type, bool townFlag) {
 	Mode oldMode = _vm->_mode;
 	_vm->_mode = oldMode == MODE_7 ? MODE_8 : MODE_7;
 	events.clearEvents();
-	setWaitBounds();
+
+	// A click on the scene is reported as the space bar. That's wanted for prompts that
+	// accept anything, but must not answer a real yes/no question once space means yes
+	const bool spaceConfirms = g_vm->_extOptions._spaceConfirms && !type;
+	if (!spaceConfirms)
+		setWaitBounds();
 
 	if (!type) {
 		Map &map = *_vm->_map;
@@ -152,7 +159,8 @@ bool YesNo::execute(bool type, bool townFlag) {
 		if (!_buttonValue)
 			continue;
 
-		if (type || _buttonValue == Common::KEYCODE_y) {
+		if (type || _buttonValue == Common::KEYCODE_y || (spaceConfirms
+				&& (_buttonValue == Common::KEYCODE_SPACE || _buttonValue == Common::KEYCODE_RETURN))) {
 			result = true;
 			break;
 		} else if (_buttonValue == Common::KEYCODE_n || _buttonValue == Common::KEYCODE_ESCAPE)

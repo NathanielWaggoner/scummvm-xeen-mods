@@ -270,6 +270,11 @@ private:
 	int _v13, _v14;
 	bool _blessed;
 	int _v5, _v6;
+
+	/**
+	 * Applies the temple's healing to a character
+	 */
+	void healCharacter(Character &c);
 protected:
 	/**
 	* Generates the display text for the location, for a given character

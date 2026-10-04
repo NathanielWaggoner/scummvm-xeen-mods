@@ -1057,6 +1057,41 @@ void Map::findMap(int mapId) {
 		error("Could not find map %d", mapId);
 }
 
+int Map::mazeIdAt(Common::Point &pt) {
+	int mapId = _vm->_party->_mazeId;
+	if (pt.x < -16 || pt.y < -16 || pt.x >= 32 || pt.y >= 32)
+		return 0;
+
+	// Step to the neighbouring maze to the north/south and then east/west as needed,
+	// in the same way as mazeLookup does
+	findMap();
+	if (pt.y & 16) {
+		if (pt.y >= 0) {
+			pt.y -= 16;
+			mapId = _mazeData[_mazeDataIndex]._surroundingMazes._north;
+		} else {
+			pt.y += 16;
+			mapId = _mazeData[_mazeDataIndex]._surroundingMazes._south;
+		}
+
+		if (mapId)
+			findMap(mapId);
+	}
+
+	if (mapId && (pt.x & 16)) {
+		if (pt.x >= 0) {
+			pt.x -= 16;
+			mapId = _mazeData[_mazeDataIndex]._surroundingMazes._east;
+		} else {
+			pt.x += 16;
+			mapId = _mazeData[_mazeDataIndex]._surroundingMazes._west;
+		}
+	}
+
+	findMap();
+	return mapId;
+}
+
 int Map::mazeLookup(const Common::Point &pt, int layerShift, int wallMask) {
 	Common::Point pos = pt;
 	int mapId = _vm->_party->_mazeId;

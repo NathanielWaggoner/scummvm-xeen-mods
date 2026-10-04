@@ -112,11 +112,45 @@ class XeenEngine : public MMEngine {
 		bool _showItemCosts;
 		bool _durableArmor;
 		bool _showHpSpBars;
+		bool _realTime;			// Monsters act on a timer rather than only when the party acts
+		uint _rtExploreMs;		// Real-time: delay between monster moves while exploring
+		uint _rtCombatMs;		// Real-time: how long a character can dither in combat
+		bool _largeBackpack;	// Four pages of backpack per item category instead of one
+		bool _bulkTraining;		// Training carries on through every affordable level
+		bool _templeHealAll;	// A at a temple heals the whole party
+		bool _levelUpMarker;	// Portraits of characters ready to train are marked
+		bool _itemStats;		// Weapon damage and armor class shown beside item names
+		bool _spaceConfirms;	// Space and Enter answer yes to confirmation prompts
+		bool _tabSwitchesChar;	// Tab steps between characters in dialogs
+		bool _mapNotes;			// Notes can be attached to tiles on the map screen
+		bool _mapZoom;			// The map screen can be zoomed and dragged about
+		bool _autoPlay;			// P lets the game explore and fight by itself
+		bool _safeCauldrons;	// Searching vats and cauldrons never does damage
+		bool _searchPreview;	// Prompts to search something say what the search will do
+		bool _maxStartStats;	// New characters get the best possible attribute rolls
+		bool _starterKit;		// New characters get basic equipment for their class
 
 		ExtendedOptions() :
 			_showItemCosts(false),
 			_durableArmor(false),
-			_showHpSpBars(false)
+			_showHpSpBars(false),
+			_realTime(false),
+			_rtExploreMs(2000),
+			_rtCombatMs(3000),
+			_largeBackpack(false),
+			_bulkTraining(false),
+			_templeHealAll(false),
+			_levelUpMarker(false),
+			_itemStats(false),
+			_spaceConfirms(false),
+			_tabSwitchesChar(false),
+			_mapNotes(false),
+			_mapZoom(false),
+			_autoPlay(false),
+			_safeCauldrons(false),
+			_searchPreview(false),
+			_maxStartStats(false),
+			_starterKit(false)
 		{}
 	};
 private:

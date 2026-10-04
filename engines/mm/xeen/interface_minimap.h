@@ -38,6 +38,11 @@ private:
 	 * Draws the indoors minimap
 	 */
 	void drawIndoorsMinimap();
+
+	/**
+	 * Draws a marker on each minimap tile that the player has put a map note on
+	 */
+	void drawMapNotes();
 public:
 	InterfaceMinimap() : _animFrame(0) {
 	}

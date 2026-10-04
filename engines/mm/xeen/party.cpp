@@ -66,6 +66,41 @@ void Roster::synchronize(Common::Serializer &s) {
 		(*this)[i].synchronize(s);
 }
 
+void Roster::synchronizeExtraItems(Common::Serializer &s, bool hasData) {
+	// The extra slots follow the original character records, tagged so that
+	// their absence in an older save can be recognised
+	uint32 tag = MKTAG('X', 'I', 'N', 'V');
+	byte itemsTotal = INV_ITEMS_TOTAL;
+
+	if (s.isSaving() || hasData) {
+		s.syncAsUint32BE(tag);
+		s.syncAsByte(itemsTotal);
+		if (tag != MKTAG('X', 'I', 'N', 'V'))
+			hasData = false;
+	}
+
+	for (uint charIdx = 0; charIdx < TOTAL_CHARACTERS; ++charIdx) {
+		Character &c = (*this)[charIdx];
+
+		for (int cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; ++cat) {
+			InventoryItems &items = c._items[(ItemCategory)cat];
+
+			if (s.isLoading()) {
+				for (int idx = INV_PAGE_SIZE; idx < INV_ITEMS_TOTAL; ++idx)
+					items[idx].clear();
+				if (!hasData)
+					continue;
+			}
+
+			// A save written with a different backpack size is still read in full,
+			// with anything beyond the current size being dropped
+			XeenItem dummy;
+			for (int idx = INV_PAGE_SIZE; idx < itemsTotal; ++idx)
+				((idx < INV_ITEMS_TOTAL) ? items[idx] : dummy).synchronize(s);
+		}
+	}
+}
+
 /*------------------------------------------------------------------------*/
 
 Treasure::Treasure() {
@@ -107,7 +142,7 @@ void BlacksmithWares::clear() {
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
 		for (int ccNum = 0; ccNum < 2; ++ccNum)
 			for (int slot = 0; slot < 4; ++slot)
-					for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+					for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 						(*this)[cat][ccNum][slot][idx].clear();
 }
 
@@ -158,7 +193,7 @@ void BlacksmithWares::blackData2CharData(Character &c) {
 	int slotIndex = getSlotIndex();
 
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
-		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+		for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 			c._items[cat][idx] = (*this)[cat][ccNum][slotIndex][idx];
 }
 
@@ -167,7 +202,7 @@ void BlacksmithWares::charData2BlackData(Character &c) {
 	int slotIndex = getSlotIndex();
 
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
-		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+		for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 			(*this)[cat][ccNum][slotIndex][idx] = c._items[cat][idx];
 }
 
@@ -195,7 +230,7 @@ uint BlacksmithWares::getSlotIndex() const {
 
 void BlacksmithWares::synchronize(Common::Serializer &s, int ccNum) {
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
-		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+		for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 			for (int slot = 0; slot < 4; ++slot)
 				(*this)[cat][ccNum][slot][idx].synchronize(s);
 }
@@ -210,6 +245,7 @@ Party::Party(XeenEngine *vm) {
 	_mazeId = _priorMazeId = 0;
 	_levitateCount = 0;
 	_automapOn = false;
+	_showMapNoteLabels = false;
 	_wizardEyeActive = false;
 	_clairvoyanceActive = false;
 	_walkOnWaterActive = false;
@@ -351,6 +387,43 @@ void Party::synchronize(Common::Serializer &s) {
 
 void Party::loadActiveParty() {
 	// No implementation needed
+}
+
+int Party::findMapNote(int mazeId, int side, const Common::Point &pos) const {
+	for (uint idx = 0; idx < _mapNotes.size(); ++idx) {
+		const MapNote &note = _mapNotes[idx];
+		if (note._mazeId == mazeId && note._side == side && note._pos == pos)
+			return idx;
+	}
+
+	return -1;
+}
+
+void Party::synchronizeMapNotes(Common::Serializer &s, bool hasData) {
+	uint32 tag = MKTAG('X', 'N', 'O', 'T');
+	uint16 count = _mapNotes.size();
+
+	if (s.isLoading())
+		_mapNotes.clear();
+	if (s.isLoading() && !hasData)
+		return;
+
+	s.syncAsUint32BE(tag);
+	if (tag != MKTAG('X', 'N', 'O', 'T'))
+		return;
+
+	s.syncAsUint16LE(count);
+	if (s.isLoading())
+		_mapNotes.resize(count);
+
+	for (uint idx = 0; idx < count; ++idx) {
+		MapNote &note = _mapNotes[idx];
+		s.syncAsSint16LE(note._mazeId);
+		s.syncAsByte(note._side);
+		s.syncAsSint16LE(note._pos.x);
+		s.syncAsSint16LE(note._pos.y);
+		s.syncString(note._text);
+	}
 }
 
 bool Party::checkSkill(Skill skillId) {
@@ -739,7 +812,7 @@ void Party::giveTreasure() {
 			if (arePacksFull()) {
 				if (_treasure._weapons[itemNum]._id >= XEEN_SLAYER_SWORD) {
 					// Xeen Slayer Sword, so clear a slot for it
-					_activeParty[0]._weapons[INV_ITEMS_TOTAL - 1].clear();
+					_activeParty[0]._weapons[InventoryItems::capacity() - 1].clear();
 				} else {
 					// Otherwise, clear all the remaining treasure items,
 					// since all the party's packs are full
@@ -788,12 +861,15 @@ void Party::giveTreasure() {
 	w.update();
 	events.clearEvents();
 
+	// During auto-play the treasure is shown for a moment and then accepted
+	const uint32 autoDismiss = g_system->getMillis() + 1500;
 	do {
 		events.updateGameCounter();
 		intf.draw3d(true);
 
 		events.wait(1, false);
-	} while (!_vm->shouldExit() && !events.isKeyMousePressed());
+	} while (!_vm->shouldExit() && !events.isKeyMousePressed()
+		&& !(intf.isAutoPlaying() && g_system->getMillis() >= autoDismiss));
 	events.clearEvents();
 
 	if (_vm->_mode != MODE_COMBAT)
@@ -817,10 +893,10 @@ bool Party::arePacksFull() const {
 	uint total = 0;
 	for (uint idx = 0; idx < _activeParty.size(); ++idx) {
 		const Character &c = _activeParty[idx];
-		total += (c._weapons[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1)
-			+ (c._armor[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1)
-			+ (c._accessories[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1)
-			+ (c._misc[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1);
+		total += (c._weapons[InventoryItems::capacity() - 1].empty() ? 0 : 1)
+			+ (c._armor[InventoryItems::capacity() - 1].empty() ? 0 : 1)
+			+ (c._accessories[InventoryItems::capacity() - 1].empty() ? 0 : 1)
+			+ (c._misc[InventoryItems::capacity() - 1].empty() ? 0 : 1);
 	}
 
 	return total == (_activeParty.size() * NUM_ITEM_CATEGORIES);
@@ -843,7 +919,7 @@ void Party::giveTreasureToCharacter(Character &c, ItemCategory category, int ite
 
 	if (treasureItem._id < 82) {
 		// Copy item into the character's inventory
-		c._items[category][INV_ITEMS_TOTAL - 1] = treasureItem;
+		c._items[category][InventoryItems::capacity() - 1] = treasureItem;
 	}
 
 	w.writeString(Res.GIVE_TREASURE_FORMATTING);
@@ -968,7 +1044,7 @@ bool Party::giveTake(int takeMode, uint takeVal, int giveMode, uint giveVal, int
 			_questItems[takeVal - MISC_END]--;
 		} else {
 			bool found = false;
-			for (int idx = 0; idx < 9; ++idx) {
+			for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
 				if (takeVal < WEAPONS_END) {
 					if (ps._weapons[idx]._id == takeVal) {
 						ps._weapons[idx].clear();

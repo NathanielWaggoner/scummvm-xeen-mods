@@ -81,6 +81,7 @@ private:
 	bool isModifierKey(const Common::KeyCode &keycode) const;
 public:
 	Common::Point _mousePos;
+	int _wheelDelta;					// Mouse wheel movement not yet acted on (up is positive)
 public:
 	EventsManager(XeenEngine *vm);
 	~EventsManager();
@@ -139,6 +140,21 @@ public:
 	 * Returns the next pending key/mouse press, if any
 	 */
 	bool getEvent(PendingEvent &pe);
+
+	/**
+	 * Returns true while a mouse button is being held down
+	 */
+	bool isMousePressed() const { return _mousePressed; }
+
+	/**
+	 * Returns how far the mouse wheel has turned since last asked, in notches,
+	 * with wheel-up positive
+	 */
+	int takeWheelDelta() {
+		int delta = _wheelDelta;
+		_wheelDelta = 0;
+		return delta;
+	}
 
 	/**
 	 * Returns true if a key or mouse event is pending

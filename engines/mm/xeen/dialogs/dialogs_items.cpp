@@ -88,6 +88,35 @@ Character *ItemsDialog::show(XeenEngine *vm, Character *c, ItemsMode mode) {
 	return result;
 }
 
+/**
+ * Returns a short summary of a weapon's damage or a piece of armor's protection, for
+ * showing beside its name so that items can be compared without identifying each one
+ */
+static Common::String itemStatSummary(const XeenItem &item, ItemCategory category) {
+	if (!g_vm->_extOptions._itemStats || !item._id)
+		return "";
+
+	const bool isMetal = item._material >= 37 && item._material <= 58;
+	if (category == CATEGORY_WEAPON) {
+		int minVal = Res.WEAPON_DAMAGE_BASE[item._id];
+		int maxVal = minVal * Res.WEAPON_DAMAGE_MULTIPLIER[item._id];
+		if (isMetal) {
+			minVal += Res.METAL_DAMAGE[item._material - 37];
+			maxVal += Res.METAL_DAMAGE[item._material - 37];
+		}
+
+		return Common::String::format(" (%d-%d)", minVal, maxVal);
+	} else if (category == CATEGORY_ARMOR) {
+		int strength = Res.ARMOR_STRENGTHS[item._id];
+		if (isMetal)
+			strength += Res.METAL_LAC[item._material - 37];
+
+		return Common::String::format(" (%+d)", strength);
+	}
+
+	return "";
+}
+
 Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 	Combat &combat = *_vm->_combat;
 	EventsManager &events = *_vm->_events;
@@ -128,6 +157,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 #endif
 
 	enum { REDRAW_NONE, REDRAW_TEXT, REDRAW_FULL } redrawFlag = REDRAW_FULL;
+	int page = 0;
 	for (;;) {
 		if (redrawFlag == REDRAW_FULL) {
 			// Write text for the dialog
@@ -170,13 +200,19 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 		if (redrawFlag == REDRAW_TEXT || redrawFlag == REDRAW_FULL) {
 			lines.clear();
 
-			for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
-				DrawStruct &ds = _itemsDrawList[idx];
+			// Shop stock only ever fills the first page
+			const int pageCount = (c == &_itemsCharacter) ? 1 : InventoryItems::capacity() / INV_PAGE_SIZE;
+			if (page >= pageCount)
+				page = 0;
+
+			for (int row = 0; row < INV_PAGE_SIZE; ++row) {
+				const int idx = page * INV_PAGE_SIZE + row;
+				DrawStruct &ds = _itemsDrawList[row];
 				XeenItem &i = c->_items[category][idx];
 
 				ds._sprites = nullptr;
 				ds._x = 8;
-				ds._y = 18 + idx * 9;
+				ds._y = 18 + row * 9;
 
 				switch (category) {
 				case CATEGORY_WEAPON:
@@ -186,12 +222,14 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 						if ((mode == ITEMMODE_CHAR_INFO && !g_vm->_extOptions._showItemCosts)
 								|| mode == ITEMMODE_8 || mode == ITEMMODE_ENCHANT || mode == ITEMMODE_RECHARGE) {
 							lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE1,
-								arr[idx], idx + 1,
-								c->_items[category].getFullDescription(idx, arr[idx]).c_str()));
+								arr[idx], row + 1,
+								(c->_items[category].getFullDescription(idx, arr[idx])
+									+ itemStatSummary(i, category)).c_str()));
 						} else {
 							lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE2,
-								arr[idx], idx + 1,
-								c->_items[category].getFullDescription(idx, arr[idx]).c_str(),
+								arr[idx], row + 1,
+								(c->_items[category].getFullDescription(idx, arr[idx])
+									+ itemStatSummary(i, category)).c_str(),
 								calcItemCost(c, idx,
 									(mode == ITEMMODE_CHAR_INFO) ? ITEMMODE_BUY : mode,
 									mode == ITEMMODE_TO_GOLD ? 1 : startingChar->_skills[MERCHANT],
@@ -204,7 +242,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 							ds._frame = i._frame;
 						else
 							ds._frame = 14;
-					} else if (ds._sprites == nullptr && idx == 0) {
+					} else if (ds._sprites == nullptr && row == 0) {
 						lines.push_back(Res.NO_ITEMS_AVAILABLE);
 					}
 					break;
@@ -212,7 +250,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 				case CATEGORY_MISC:
 					if (i._material == 0) {
 						// No item
-						if (idx == 0) {
+						if (row == 0) {
 							lines.push_back(Res.NO_ITEMS_AVAILABLE);
 						}
 					} else {
@@ -227,7 +265,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 						}
 
 						lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE2,
-							arr[idx], idx + 1,
+							arr[idx], row + 1,
 							c->_items[category].getFullDescription(idx, arr[idx]).c_str(),
 							calcItemCost(c, idx, tempMode, skill, category)
 						));
@@ -244,7 +282,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			_buttonTexts.resize(lines.size() + buttonTextCount - 1);
 #endif
 
-			while (lines.size() < INV_ITEMS_TOTAL)
+			while (lines.size() < INV_PAGE_SIZE)
 				lines.push_back("");
 
 			Common::String ttsMessage;
@@ -326,8 +364,15 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			}
 #endif
 
+			if (pageCount > 1) {
+				// Kept well clear of the window's right edge: text that would cross
+				// it gets wrapped onto the next line instead
+				windows[30].writeString(Common::String::format(
+					"\x03""l\x02\t270\v000\f15%d/%d\fd\x01", page + 1, pageCount));
+			}
+
 			// Draw the glyphs for the items
-			windows[0].drawList(_itemsDrawList, INV_ITEMS_TOTAL);
+			windows[0].drawList(_itemsDrawList, INV_PAGE_SIZE);
 			windows[0].update();
 		}
 
@@ -433,7 +478,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 							ErrorScroll::show(_vm, Common::String::format(
 													   Res.CATEGORY_BACKPACK_IS_FULL[category], newChar->_name.c_str()));
 						else {
-							XeenItem &destItem = destItems[INV_ITEMS_TOTAL - 1];
+							XeenItem &destItem = destItems[InventoryItems::capacity() - 1];
 							destItem = srcItem;
 							srcItem.clear();
 							destItem._frame = 0;
@@ -464,6 +509,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			// Select an item
 			if (mode != ITEMMODE_3) {
 				_buttonValue -= Common::KEYCODE_1;
+				_buttonValue += page * INV_PAGE_SIZE;
 				if (_buttonValue != itemIndex) {
 					// Check whether the new selection has an associated item
 					if (!c->_items[category][_buttonValue].empty()) {
@@ -478,6 +524,16 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 
 				redrawFlag = REDRAW_TEXT;
 			}
+
+		} else if (Common::KEYCODE_PAGEDOWN == _buttonValue || Common::KEYCODE_PAGEUP == _buttonValue
+				|| Common::KEYCODE_PERIOD == _buttonValue || Common::KEYCODE_COMMA == _buttonValue) {
+			// Next/previous page of the backpack
+			bool isNext = Common::KEYCODE_PAGEDOWN == _buttonValue || Common::KEYCODE_PERIOD == _buttonValue;
+			const int pages = InventoryItems::capacity() / INV_PAGE_SIZE;
+			page = (page + (isNext ? 1 : pages - 1)) % pages;
+			Common::fill(&arr[0], &arr[40], 0);
+			itemIndex = -1;
+			redrawFlag = REDRAW_FULL;
 
 		} else if (Res.KeyConstants.DialogsItems.KEY_WEAPONS == _buttonValue) {
 			// Weapons category
@@ -953,7 +1009,7 @@ int ItemsDialog::doItemOptions(Character &c, int actionIndex, int itemIndex, Ite
 
 						// Add entry to the end of the list
 						XeenItem &srcItem = c._items[category][itemIndex];
-						XeenItem &destItem = _oldCharacter->_items[category][INV_ITEMS_TOTAL - 1];
+						XeenItem &destItem = _oldCharacter->_items[category][InventoryItems::capacity() - 1];
 						destItem = srcItem;
 						destItem._frame = 0;
 

@@ -82,7 +82,7 @@ int Input::getString(Common::String &line, uint maxLen, int maxWidth, bool isNum
 	bool nonEnCharset = false;
 
 	_vm->_noDirectionSense = true;
-	Common::String msg = Common::String::format("\x3""l\t000\x4%03d\x3""c", maxWidth);
+	Common::String msg = Common::String::format("\x3""l\t000\x4%03d\x3""c%s", maxWidth, line.c_str());
 	_window->writeString(msg, false);
 	_window->update();
 

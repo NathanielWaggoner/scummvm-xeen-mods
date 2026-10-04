@@ -45,9 +45,14 @@ void MessageDialog::execute(const Common::String &msg, MessageWaitType waitType)
 	w.writeString(msg);
 	w.update();
 
+	// During auto-play, messages that wait for a key are closed after a moment
+	const bool autoPlaying = _vm->_interface->isAutoPlaying();
+	const uint32 autoDismiss = g_system->getMillis() + 1500;
+
 	switch (waitType) {
 	case WT_FREEZE_WAIT:
-		while (!_vm->shouldExit() && !events.isKeyMousePressed())
+		while (!_vm->shouldExit() && !events.isKeyMousePressed()
+				&& !(autoPlaying && g_system->getMillis() >= autoDismiss))
 			events.pollEventsAndWait();
 
 		events.clearEvents();
@@ -70,6 +75,8 @@ void MessageDialog::execute(const Common::String &msg, MessageWaitType waitType)
 
 			events.wait(1);
 			if (checkEvents(_vm))
+				break;
+			if (autoPlaying && g_system->getMillis() >= autoDismiss)
 				break;
 		} while (!_vm->shouldExit() && !_buttonValue);
 #ifdef USE_TTS

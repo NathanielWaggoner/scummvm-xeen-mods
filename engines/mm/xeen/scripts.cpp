@@ -146,6 +146,7 @@ int Scripts::checkEvents() {
 	_scriptExecuted = false;
 	_dirFlag = false;
 	_whoWill = 0;
+	_skipDamage = false;
 	Mode oldMode = _vm->_mode;
 	Common::fill(&intf._charFX[0], &intf._charFX[MAX_ACTIVE_PARTY], 0);
 
@@ -1032,7 +1033,8 @@ bool Scripts::cmdDamage(ParamsIterator &params) {
 
 	int damage = params.readUint16LE();
 	DamageType damageType = (DamageType)params.readByte();
-	combat.giveCharDamage(damage, damageType, _charIndex - 1);
+	if (!_skipDamage)
+		combat.giveCharDamage(damage, damageType, _charIndex - 1);
 
 	return true;
 }
@@ -1139,10 +1141,156 @@ bool Scripts::cmdCutsceneEndClouds(ParamsIterator &params) {
 	return false;
 }
 
+Common::String Scripts::describeOutcome(bool includeDamage) const {
+	static const char *const STAT_NAMES[7] = {
+		"Might", "Intellect", "Personality", "Endurance", "Speed", "Accuracy", "Luck"
+	};
+	static const char *const RESIST_NAMES[6] = {
+		"fire", "electricity", "cold", "poison", "energy", "magic"
+	};
+	const MazeEvents &events = _vm->_map->_events;
+	Common::StringArray parts;
+	int permStats[7] = { 0, 0, 0, 0, 0, 0, 0 };
+	int items = 0;
+
+	for (uint idx = 0; idx < events.size(); ++idx) {
+		const MazeEvent &e = events[idx];
+		if (e._position != _currentPos || e._line <= _lineNum)
+			continue;
+
+		const EventParameters &p = e._parameters;
+		uint pos = 0;
+
+		switch (e._opcode) {
+		case OP_TakeOrGive:
+		case OP_TakeOrGive_2:
+		case OP_TakeOrGive_3:
+		case OP_TakeOrGive_4:
+		case OP_GiveMulti: {
+			// These hold up to three pairs of a kind and an amount, the amount's size
+			// depending on the kind. For the take-or-give commands the first pair is what
+			// is taken or tested, and the rest what is given
+			for (int pair = 0; pair < 3 && pos < p.size(); ++pair) {
+				const int mode = p[pos++];
+				uint32 val = 0;
+				const uint width = (mode == 16 || mode == 34 || mode == 100) ? 4 :
+					((mode == 25 || mode == 35 || mode == 101 || mode == 106) ? 2 : 1);
+				for (uint b = 0; b < width && pos < p.size(); ++b)
+					val |= (uint32)p[pos++] << (8 * b);
+
+				if (pair == 0 && e._opcode != OP_GiveMulti)
+					continue;
+
+				if (mode >= 45 && mode <= 51)
+					permStats[mode - 45] += val;
+				else if (mode >= 37 && mode <= 43)
+					parts.push_back(Common::String::format("+%u %s (temporary)", val, STAT_NAMES[mode - 37]));
+				else if (mode >= 52 && mode <= 57)
+					parts.push_back(Common::String::format("+%u %s resistance", val, RESIST_NAMES[mode - 52]));
+				else if (mode >= 58 && mode <= 63)
+					parts.push_back(Common::String::format("+%u %s resistance (temporary)", val, RESIST_NAMES[mode - 58]));
+				else if (mode == 16)
+					parts.push_back(Common::String::format("+%u experience", val));
+				else if (mode == 34)
+					parts.push_back(Common::String::format("+%u gold", val));
+				else if (mode == 100)
+					parts.push_back(Common::String::format("up to %u gold", val));
+				else if (mode == 35)
+					parts.push_back(Common::String::format("+%u gems", val));
+				else if (mode == 64)
+					parts.push_back(Common::String::format("+%u level", val));
+				else if (mode == 65)
+					parts.push_back(Common::String::format("+%u food", val));
+				else if (mode == 77)
+					parts.push_back(Common::String::format("+%u armor class (temporary)", val));
+				else if (mode == 78)
+					parts.push_back("hit points restored");
+				else if (mode == 81)
+					parts.push_back("spell points restored");
+				else if (mode == 66)
+					++items;
+				else if (mode == 82 && includeDamage)
+					parts.push_back(Common::String::format("%u damage", val));
+			}
+			break;
+		}
+
+		case OP_GiveEnchanted:
+			++items;
+			break;
+
+		case OP_Damage:
+			if (includeDamage && p.size() >= 2)
+				parts.push_back(Common::String::format("%d damage", p[0] | (p[1] << 8)));
+			break;
+
+		case OP_RndDamage:
+			if (includeDamage && p.size() >= 2)
+				parts.push_back(Common::String::format("up to %d damage", p[1]));
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	// Permanent statistic gains are folded into one entry when they're all alike
+	bool allSame = permStats[0] != 0;
+	for (int stat = 1; stat < 7; ++stat)
+		allSame = allSame && permStats[stat] == permStats[0];
+	if (allSame) {
+		parts.insert_at(0, Common::String::format("+%d all statistics", permStats[0]));
+	} else {
+		for (int stat = 6; stat >= 0; --stat) {
+			if (permStats[stat])
+				parts.insert_at(0, Common::String::format("+%d %s", permStats[stat], STAT_NAMES[stat]));
+		}
+	}
+
+	if (items == 1)
+		parts.push_back("an item");
+	else if (items > 1)
+		parts.push_back(Common::String::format("%d items", items));
+
+	if (parts.empty())
+		return "nothing";
+
+	Common::String result;
+	for (uint idx = 0; idx < parts.size(); ++idx)
+		result += (idx ? ", " : "") + parts[idx];
+	return result;
+}
+
 bool Scripts::cmdWhoWill(ParamsIterator &params) {
+	Interface &intf = *_vm->_interface;
 	int msg = params.readByte();
 	int action = params.readByte();
+
+	// With safe cauldrons, any damage in the rest of a script that has someone search
+	// a vat or cauldron is left out. The thing being searched is named by a map text
+	if (g_vm->_extOptions._safeCauldrons && action < (int)_vm->_map->_events._text.size()) {
+		Common::String name = _vm->_map->_events._text[action];
+		name.toLowercase();
+		if (name.contains("vat") || name.contains("cauldron"))
+			_skipDamage = true;
+	}
+
+	// With the search preview, what the script goes on to do is shown over the scene
+	// for as long as the prompt is up
+	const bool oldUpDoorText = intf._upDoorText;
+	const Common::String oldScreenText = intf._screenText;
+	if (g_vm->_extOptions._searchPreview) {
+		intf._screenText = Common::String::format("\f08\x03""c\t116\v090%s\x03""l\fd",
+			describeOutcome(!_skipDamage).c_str());
+		intf._upDoorText = true;
+	}
+
 	_charIndex = WhoWill::show(_vm, msg, action, true);
+
+	if (g_vm->_extOptions._searchPreview) {
+		intf._screenText = oldScreenText;
+		intf._upDoorText = oldUpDoorText;
+	}
 
 	if (_charIndex == 0)
 		return cmdExit(params);
@@ -1161,7 +1309,8 @@ bool Scripts::cmdRndDamage(ParamsIterator &params) {
 
 	DamageType dmgType = (DamageType)params.readByte();
 	int max = params.readByte();
-	combat.giveCharDamage(_vm->getRandomNumber(1, max), dmgType, _charIndex - 1);
+	if (!_skipDamage)
+		combat.giveCharDamage(_vm->getRandomNumber(1, max), dmgType, _charIndex - 1);
 	return true;
 }
 

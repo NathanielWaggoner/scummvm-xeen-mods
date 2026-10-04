@@ -23,6 +23,7 @@
 #define XEEN_INTERFACE_H
 
 #include "common/scummsys.h"
+#include "common/hashmap.h"
 #include "mm/xeen/dialogs/dialogs.h"
 #include "mm/xeen/interface_minimap.h"
 #include "mm/xeen/interface_scene.h"
@@ -69,6 +70,12 @@ private:
 public:
 	PartyDrawer(XeenEngine *vm);
 
+	/**
+	 * Returns the index of the character whose portrait is highlighted, or a
+	 * negative value if none is
+	 */
+	int highlightedChar() const { return _hiliteChar; }
+
 	void drawParty(bool updateFlag);
 
 	/**
@@ -113,8 +120,57 @@ private:
 	int _holyBonusUIFrame;
 	int _heroismUIFrame;
 	int _flipUIFrame;
+	uint32 _rtNextTick;
 
 	void loadSprites();
+
+	/**
+	 * Toggles between real-time and turn-based play
+	 */
+	void toggleRealTime();
+
+	/**
+	 * Returns true once the given real-time interval has run out. The timer
+	 * starts on the first call after resetRealTimeTimer
+	 */
+	bool realTimeElapsed(uint intervalMs);
+
+	void resetRealTimeTimer() { _rtNextTick = 0; }
+
+	// Auto-play: the game explores and fights by itself until switched off
+	bool _autoPlaying;
+	bool _autoProbing;				// Set while testing a step, to keep the test silent
+	uint32 _autoNextTime;
+	int _autoShots;					// Ranged attacks made in a row
+	Common::Point _autoLastTile;
+	Common::HashMap<uint32, int> _autoVisits;
+
+	/**
+	 * Switches auto-play on or off
+	 */
+	void toggleAutoPlay();
+
+	/**
+	 * Returns true if the party is in good enough shape for auto-play to carry on
+	 */
+	bool autoPlayPartyOk() const;
+
+	/**
+	 * Returns true if the party could step in a direction from where it is, and the
+	 * tile there is one auto-play is willing to walk onto
+	 */
+	bool autoPlayCanStep(Direction dir);
+
+	/**
+	 * Picks what auto-play does next while exploring, as a key press
+	 */
+	void autoPlayExplore();
+
+	/**
+	 * Has the character whose turn it is in combat cast their ready spell at the
+	 * monsters if it's an attack they can afford, and otherwise attack
+	 */
+	void autoPlayFight();
 
 	void setupBackground();
 
@@ -187,6 +243,11 @@ public:
 	void setup();
 
 	void manageCharacters(bool soundPlayed);
+
+	/**
+	 * Returns true while the game is playing itself
+	 */
+	bool isAutoPlaying() const { return _autoPlaying; }
 
 	void startup();
 

@@ -116,6 +116,30 @@ bool ButtonContainer::checkEvents(XeenEngine *vm) {
 					&& keycode != Common::KEYCODE_LALT && keycode != Common::KEYCODE_RALT)
 				_buttonValue = keycode;
 
+			if (keycode == Common::KEYCODE_TAB && g_vm->_extOptions._tabSwitchesChar) {
+				// Outside the main view, where Tab opens the control panel, Tab steps
+				// to the next character and Shift-Tab to the previous one, by standing
+				// in for that character's function key
+				bool hasTabButton = false;
+				for (uint i = 0; i < _buttons.size(); ++i)
+					hasTabButton |= _buttons[i]._value == Common::KEYCODE_TAB;
+
+				int count = (vm->_mode == MODE_COMBAT) ? vm->_combat->_combatParty.size() :
+					party._activeParty.size();
+				if (!hasTabButton && count > 0) {
+					const bool backwards = (event._keyState.flags & Common::KBD_SHIFT) != 0;
+					int current = vm->_interface->highlightedChar();
+					int next;
+					if (current < 0 || current >= count)
+						next = backwards ? count - 1 : 0;
+					else
+						next = (current + (backwards ? count - 1 : 1)) % count;
+
+					_buttonValue = Common::KEYCODE_F1 + next;
+					return true;
+				}
+			}
+
 			if (_buttonValue) {
 				_buttonValue |= (event._keyState.flags & ~Common::KBD_STICKY) << 16;
 #ifdef USE_TTS

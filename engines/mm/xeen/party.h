@@ -66,6 +66,12 @@ public:
 	Roster();
 
 	void synchronize(Common::Serializer &s);
+
+	/**
+	 * Saves or loads the backpack slots beyond the original nine per category.
+	 * When loading, hasData is false for saves that predate the larger backpack
+	 */
+	void synchronizeExtraItems(Common::Serializer &s, bool hasData);
 };
 
 class Treasure {
@@ -101,7 +107,7 @@ public:
 /**
  * Each side of Xeen supports 4 blacksmith inventories of up to 9 items each
  */
-typedef XeenItem BlacksmithItems[2][4][INV_ITEMS_TOTAL];
+typedef XeenItem BlacksmithItems[2][4][SHOP_ITEMS_TOTAL];
 
 class BlacksmithWares {
 private:
@@ -154,6 +160,20 @@ public:
 	 * Synchronizes data for the blacksmith wares
 	 */
 	void synchronize(Common::Serializer &s, int ccNum);
+};
+
+/**
+ * A note the player has attached to a map tile
+ */
+struct MapNote {
+	int _mazeId;
+	int _side;
+	Common::Point _pos;
+	Common::String _text;
+
+	MapNote() : _mazeId(0), _side(0) {}
+	MapNote(int mazeId, int side, const Common::Point &pos, const Common::String &text) :
+		_mazeId(mazeId), _side(side), _pos(pos), _text(text) {}
 };
 
 class Party {
@@ -237,6 +257,8 @@ public:
 public:
 	// Other party related runtime data
 	Roster _roster;
+	Common::Array<MapNote> _mapNotes;
+	bool _showMapNoteLabels;	// Whether the text of every map note is on show. Not saved
 	CharacterArray _activeParty;
 	bool _newDay;
 	bool _isNight;
@@ -256,6 +278,17 @@ public:
 	void synchronize(Common::Serializer &s);
 
 	void loadActiveParty();
+
+	/**
+	 * Returns the index of the map note on a given tile, or -1 if there isn't one
+	 */
+	int findMapNote(int mazeId, int side, const Common::Point &pos) const;
+
+	/**
+	 * Saves or loads the map notes. When loading, hasData is false for saves
+	 * that predate them
+	 */
+	void synchronizeMapNotes(Common::Serializer &s, bool hasData);
 
 	bool checkSkill(Skill skillId);
 

@@ -172,6 +172,18 @@ public:
 	int castSpell(Character *c, MagicSpell spellId);
 
 	/**
+	 * Returns true if a spell is a direct attack on monsters that needs no further
+	 * choices from the player
+	 */
+	static bool isAttackSpell(MagicSpell spellId);
+
+	/**
+	 * Returns true if the character has the spell points, and the party the gems,
+	 * to cast a spell
+	 */
+	bool canAfford(const Character &c, MagicSpell spellId) const;
+
+	/**
 	 * Subtract the requirements for a given spell if available, returning
 	 * true if there was sufficient
 	 */

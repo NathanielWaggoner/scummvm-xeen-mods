@@ -19,6 +19,7 @@
  *
  */
 
+#include "graphics/paletteman.h"
 #include "mm/xeen/interface_minimap.h"
 #include "mm/xeen/xeen.h"
 
@@ -59,9 +60,97 @@ void InterfaceMinimap::drawMinimap() {
 	else
 		drawIndoorsMinimap();
 
+	if (g_vm->_extOptions._mapNotes)
+		drawMapNotes();
+
 	// Draw outer rectangle around the automap
 	res._globalSprites.draw(1, 6, Common::Point(223, 3));
 	party._wizardEyeActive = eyeActive;
+}
+
+void InterfaceMinimap::drawMapNotes() {
+	Map &map = *g_vm->_map;
+	Party &party = *g_vm->_party;
+	Screen &screen = *g_vm->_screen;
+	if (party._mapNotes.empty())
+		return;
+
+	// Pick out a bright and a dark color for the markers from the current palette,
+	// the same way the full map does
+	byte palette[256 * 3];
+	g_system->getPaletteManager()->grabPalette(palette, 0, 256);
+	int bestLight = -1, bestDark = 0x7fffffff;
+	byte noteColor = 0, outlineColor = 0;
+	for (int idx = 0; idx < 256; ++idx) {
+		const int r = palette[idx * 3], g = palette[idx * 3 + 1], b = palette[idx * 3 + 2];
+		if (r + g - b > bestLight) {
+			bestLight = r + g - b;
+			noteColor = idx;
+		}
+		if (r + g + b < bestDark) {
+			bestDark = r + g + b;
+			outlineColor = idx;
+		}
+	}
+
+	// The minimap is centred on the party, with north at the top
+	for (int row = 0; row <= MINIMAP_DIFF * 2; ++row) {
+		for (int col = 0; col <= MINIMAP_DIFF * 2; ++col) {
+			// The party's own tile is left clear for its arrow
+			if (row == MINIMAP_DIFF && col == MINIMAP_DIFF)
+				continue;
+
+			Common::Point tile(party._mazePosition.x - MINIMAP_DIFF + col,
+				party._mazePosition.y + MINIMAP_DIFF - row);
+			int mazeId = map.mazeIdAt(tile);
+			if (!mazeId || party.findMapNote(mazeId, map._loadCcNum, tile) == -1)
+				continue;
+
+			const int xp = MINIMAP_XSTART + col * TILE_WIDTH + 2, yp = MINIMAP_YSTART + row * TILE_HEIGHT + 1;
+			screen.fillRect(Common::Rect(xp, yp, xp + 6, yp + 6), outlineColor);
+			screen.fillRect(Common::Rect(xp + 1, yp + 1, xp + 5, yp + 5), noteColor);
+		}
+	}
+
+	if (!party._showMapNoteLabels)
+		return;
+
+	// The text of each note goes just above its marker, cut down to fit: the whole
+	// minimap is only seven tiles wide
+	Window &w = (*g_vm->_windows)[1];
+	const Common::Rect area(MINIMAP_XSTART, MINIMAP_YSTART,
+		MINIMAP_XSTART + MINIMAP_SIZE * TILE_WIDTH, MINIMAP_YSTART + MINIMAP_SIZE * TILE_HEIGHT);
+	enum { LABEL_HEIGHT = 8 };
+
+	for (int row = 0; row <= MINIMAP_DIFF * 2; ++row) {
+		for (int col = 0; col <= MINIMAP_DIFF * 2; ++col) {
+			if (row == MINIMAP_DIFF && col == MINIMAP_DIFF)
+				continue;
+
+			Common::Point tile(party._mazePosition.x - MINIMAP_DIFF + col,
+				party._mazePosition.y + MINIMAP_DIFF - row);
+			int mazeId = map.mazeIdAt(tile);
+			int noteIdx = mazeId ? party.findMapNote(mazeId, map._loadCcNum, tile) : -1;
+			if (noteIdx == -1)
+				continue;
+
+			Common::String label = party._mapNotes[noteIdx]._text;
+			while (label.size() > 1 && w.getStringWidth(label, true) > area.width() - 4)
+				label.deleteLastChar();
+
+			const int xp = MINIMAP_XSTART + col * TILE_WIDTH + 2, yp = MINIMAP_YSTART + row * TILE_HEIGHT + 1;
+			const int width = w.getStringWidth(label, true);
+			const int labelX = CLIP<int>(xp + 3 - width / 2, area.left + 1, area.right - width - 2);
+			int labelY = yp - LABEL_HEIGHT - 1;
+			if (labelY < area.top)
+				labelY = yp + 7;
+
+			screen.fillRect(Common::Rect(labelX - 1, labelY - 1, labelX + width + 1, labelY + LABEL_HEIGHT),
+				outlineColor);
+			w._writePos = Common::Point(labelX, labelY);
+			w.FontSurface::writeString("\x03""l\x02\f""08" + label + "\fd\x01", area, false);
+		}
+	}
 }
 
 void InterfaceMinimap::drawOutdoorsMinimap() {

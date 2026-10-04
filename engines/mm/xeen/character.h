@@ -33,7 +33,12 @@
 namespace MM {
 namespace Xeen {
 
-#define INV_ITEMS_TOTAL 9
+// Backpack slots per item category. The original game had 9, which is still how many
+// the items dialog shows at once, and how many of each category a shop stocks
+#define INV_PAGE_SIZE 9
+#define INV_PAGES 4
+#define INV_ITEMS_TOTAL (INV_PAGE_SIZE * INV_PAGES)
+#define SHOP_ITEMS_TOTAL 9
 #define SPELLS_PER_CLASS 39
 #define AWARDS_TOTAL 88
 #define WARZONE_AWARD 9
@@ -189,6 +194,12 @@ public:
 	 * Clears the data for a character
 	 */
 	void clear();
+
+	/**
+	 * Puts a basic weapon, a missile weapon and whatever armor the character's class
+	 * can use into their backpack
+	 */
+	void giveStarterKit();
 
 	/**
 	 * Assignment operator

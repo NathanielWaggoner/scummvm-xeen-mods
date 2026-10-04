@@ -279,9 +279,13 @@ void InventoryItems::enchantItem(int itemIndex, int amount) {
 	ErrorScroll::show(vm, Common::String::format(Res.NOT_ENCHANTABLE, Res.SPELL_FAILED));
 }
 
+int InventoryItems::capacity() {
+	return g_vm->_extOptions._largeBackpack ? INV_ITEMS_TOTAL : INV_PAGE_SIZE;
+}
+
 bool InventoryItems::isFull() const {
 	assert(size() == INV_ITEMS_TOTAL);
-	return !operator[](size() - 1).empty();
+	return !operator[](capacity() - 1).empty();
 }
 
 void InventoryItems::capitalizeItem(Common::String &name) {
