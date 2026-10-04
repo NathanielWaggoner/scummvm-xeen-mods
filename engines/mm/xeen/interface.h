@@ -69,6 +69,12 @@ private:
 public:
 	PartyDrawer(XeenEngine *vm);
 
+	/**
+	 * Returns the index of the character whose portrait is highlighted, or a
+	 * negative value if none is
+	 */
+	int highlightedChar() const { return _hiliteChar; }
+
 	void drawParty(bool updateFlag);
 
 	/**
