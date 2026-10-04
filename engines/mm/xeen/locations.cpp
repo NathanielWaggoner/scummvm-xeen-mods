@@ -2802,6 +2802,15 @@ bool LocationMessage::execute(int portrait, const Common::String &name, const Co
 			return false;
 		}
 
+		// With the quality of life option the space bar and Enter answer yes. A click on
+		// the scene is reported as the space bar, so that has to be switched off while
+		// an actual question is showing, or a stray click would answer it
+		const bool spaceConfirms = g_vm->_extOptions._qualityOfLife && !msgEnd && !confirm;
+		if (spaceConfirms)
+			_waitBounds = Common::Rect();
+		else
+			setWaitBounds();
+
 		do {
 			events.clearEvents();
 			clearEvents();
@@ -2825,7 +2834,8 @@ bool LocationMessage::execute(int portrait, const Common::String &name, const Co
 			if (confirm || _buttonValue == Common::KEYCODE_ESCAPE ||
 					_buttonValue == Common::KEYCODE_n)
 				result = 0;
-			else if (_buttonValue == Common::KEYCODE_y)
+			else if (_buttonValue == Common::KEYCODE_y || (spaceConfirms
+					&& (_buttonValue == Common::KEYCODE_SPACE || _buttonValue == Common::KEYCODE_RETURN)))
 				result = 1;
 		} while (result == -1);
 

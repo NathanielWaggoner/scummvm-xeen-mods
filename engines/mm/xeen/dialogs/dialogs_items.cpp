@@ -1041,7 +1041,7 @@ int ItemsDialog::doItemOptions(Character &c, int actionIndex, int itemIndex, Ite
 				Common::String msg = Common::String::format(Res.SELL_X_FOR_Y_GOLD,
 					desc.c_str(), cost, getGoldPlurals(cost));
 
-				if (Confirm::show(_vm, msg, 0, g_vm->_extOptions._qualityOfLife)) {
+				if (Confirm::show(_vm, msg)) {
 					// Remove the sold item and add gold to the party's total
 					item.clear();
 					c._items[category].sort();
