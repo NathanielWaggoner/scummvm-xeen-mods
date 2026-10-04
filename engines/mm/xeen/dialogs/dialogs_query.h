@@ -31,9 +31,14 @@ class Confirm : public ButtonContainer {
 private:
 	Confirm(XeenEngine *vm) : ButtonContainer(vm) {}
 
-	bool execute(const Common::String &msg, int mode);
+	bool execute(const Common::String &msg, int mode, bool spaceConfirms);
 public:
-	static bool show(XeenEngine *vm, const Common::String &msg, int mode = 0);
+	/**
+	 * Shows a yes/no confirmation. If spaceConfirms is set, the space bar and
+	 * Enter also count as a yes
+	 */
+	static bool show(XeenEngine *vm, const Common::String &msg, int mode = 0,
+		bool spaceConfirms = false);
 };
 
 class YesNo : public ButtonContainer {

@@ -25,15 +25,15 @@
 namespace MM {
 namespace Xeen {
 
-bool Confirm::show(XeenEngine *vm, const Common::String &msg, int mode) {
+bool Confirm::show(XeenEngine *vm, const Common::String &msg, int mode, bool spaceConfirms) {
 	Confirm *dlg = new Confirm(vm);
-	bool result = dlg->execute(msg, mode);
+	bool result = dlg->execute(msg, mode, spaceConfirms);
 	delete dlg;
 
 	return result;
 }
 
-bool Confirm::execute(const Common::String &msg, int mode) {
+bool Confirm::execute(const Common::String &msg, int mode, bool spaceConfirms) {
 	EventsManager &events = *_vm->_events;
 	Windows &windows = *_vm->_windows;
 	SpriteResource confirmSprites;
@@ -81,7 +81,8 @@ bool Confirm::execute(const Common::String &msg, int mode) {
 				|| _buttonValue == Common::KEYCODE_n)
 			break;
 
-		if (_buttonValue == Common::KEYCODE_y) {
+		if (_buttonValue == Common::KEYCODE_y || (spaceConfirms
+				&& (_buttonValue == Common::KEYCODE_SPACE || _buttonValue == Common::KEYCODE_RETURN))) {
 			result = true;
 			break;
 		}

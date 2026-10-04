@@ -344,6 +344,22 @@ void XeenEngine::play() {
 		debug("Backpack test: %d of 20 weapons survived the reload", count);
 	}
 
+	if (ConfMan.hasKey("TestSell") && ConfMan.getBool("TestSell")) {
+		// Testing aid: open the blacksmith and report what was sold during the visit
+		Character &c = _party->_activeParty[0];
+		int weapons = 0;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			weapons += c._weapons[idx].empty() ? 0 : 1;
+		debug("Sell test: %d weapons, gold %u before", weapons, _party->_gold);
+
+		_locations->doAction(BLACKSMITH);
+
+		weapons = 0;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			weapons += c._weapons[idx].empty() ? 0 : 1;
+		debug("Sell test: %d weapons, gold %u after", weapons, _party->_gold);
+	}
+
 	if (ConfMan.hasKey("TestQoL") && ConfMan.getBool("TestQoL")) {
 		// Testing aid: visit the temple and training grounds with a rich, experienced,
 		// injured party, and report what a visit to each achieved
