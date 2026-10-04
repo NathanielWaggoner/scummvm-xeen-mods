@@ -88,6 +88,35 @@ Character *ItemsDialog::show(XeenEngine *vm, Character *c, ItemsMode mode) {
 	return result;
 }
 
+/**
+ * Returns a short summary of a weapon's damage or a piece of armor's protection, for
+ * showing beside its name so that items can be compared without identifying each one
+ */
+static Common::String itemStatSummary(const XeenItem &item, ItemCategory category) {
+	if (!g_vm->_extOptions._qualityOfLife || !item._id)
+		return "";
+
+	const bool isMetal = item._material >= 37 && item._material <= 58;
+	if (category == CATEGORY_WEAPON) {
+		int minVal = Res.WEAPON_DAMAGE_BASE[item._id];
+		int maxVal = minVal * Res.WEAPON_DAMAGE_MULTIPLIER[item._id];
+		if (isMetal) {
+			minVal += Res.METAL_DAMAGE[item._material - 37];
+			maxVal += Res.METAL_DAMAGE[item._material - 37];
+		}
+
+		return Common::String::format(" (%d-%d)", minVal, maxVal);
+	} else if (category == CATEGORY_ARMOR) {
+		int strength = Res.ARMOR_STRENGTHS[item._id];
+		if (isMetal)
+			strength += Res.METAL_LAC[item._material - 37];
+
+		return Common::String::format(" (%+d)", strength);
+	}
+
+	return "";
+}
+
 Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 	Combat &combat = *_vm->_combat;
 	EventsManager &events = *_vm->_events;
@@ -194,11 +223,13 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 								|| mode == ITEMMODE_8 || mode == ITEMMODE_ENCHANT || mode == ITEMMODE_RECHARGE) {
 							lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE1,
 								arr[idx], row + 1,
-								c->_items[category].getFullDescription(idx, arr[idx]).c_str()));
+								(c->_items[category].getFullDescription(idx, arr[idx])
+									+ itemStatSummary(i, category)).c_str()));
 						} else {
 							lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE2,
 								arr[idx], row + 1,
-								c->_items[category].getFullDescription(idx, arr[idx]).c_str(),
+								(c->_items[category].getFullDescription(idx, arr[idx])
+									+ itemStatSummary(i, category)).c_str(),
 								calcItemCost(c, idx,
 									(mode == ITEMMODE_CHAR_INFO) ? ITEMMODE_BUY : mode,
 									mode == ITEMMODE_TO_GOLD ? 1 : startingChar->_skills[MERCHANT],
@@ -333,9 +364,12 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			}
 #endif
 
-			if (pageCount > 1)
+			if (pageCount > 1) {
+				// Kept well clear of the window's right edge: text that would cross
+				// it gets wrapped onto the next line instead
 				windows[30].writeString(Common::String::format(
-					"\x03""l\t282\v000\f15%d/%d\fd", page + 1, pageCount));
+					"\x03""l\x02\t270\v000\f15%d/%d\fd\x01", page + 1, pageCount));
+			}
 
 			// Draw the glyphs for the items
 			windows[0].drawList(_itemsDrawList, INV_PAGE_SIZE);
