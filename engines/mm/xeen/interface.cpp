@@ -212,6 +212,16 @@ void PartyDrawer::drawParty(bool updateFlag) {
 		drawHitPoints(idx);
 	}
 
+	if (g_vm->_extOptions._qualityOfLife) {
+		// Mark anyone who has the experience to train for their next level
+		for (uint idx = 0; idx < partyCount; ++idx) {
+			Character &c = inCombat ? *combat._combatParty[idx] : party._activeParty[idx];
+			if (!c.experienceToNextLevel())
+				windows[0].writeString(Common::String::format("\x03""l\t%03d\v150\f15+\fd",
+					Res.CHAR_FACES_X[idx] + 1), false);
+		}
+	}
+
 	if (_hiliteChar != HILIGHT_CHAR_NONE)
 		res._globalSprites.draw(0, 8, Common::Point(Res.CHAR_FACES_X[_hiliteChar] - 1, 149));
 

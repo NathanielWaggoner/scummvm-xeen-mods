@@ -25,6 +25,7 @@
 #include "common/events.h"
 #include "engines/util.h"
 #include "mm/xeen/xeen.h"
+#include "mm/xeen/locations.h"
 #include "mm/xeen/files.h"
 #include "mm/xeen/resources.h"
 
@@ -185,6 +186,7 @@ void XeenEngine::loadSettings() {
 	if (ConfMan.hasKey("RealTimeCombatMs"))
 		_extOptions._rtCombatMs = MAX(ConfMan.getInt("RealTimeCombatMs"), 250);
 
+	_extOptions._qualityOfLife = ConfMan.hasKey("QualityOfLife") && ConfMan.getBool("QualityOfLife");
 	_extOptions._smoothMove = ConfMan.hasKey("SmoothMove") && ConfMan.getBool("SmoothMove");
 	if (ConfMan.hasKey("SmoothMoveTileMs"))
 		_extOptions._glideTileMs = CLIP(ConfMan.getInt("SmoothMoveTileMs"), 60, 2000);
@@ -340,6 +342,30 @@ void XeenEngine::play() {
 		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
 			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
 		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
+	if (ConfMan.hasKey("TestQoL") && ConfMan.getBool("TestQoL")) {
+		// Testing aid: visit the temple and training grounds with a rich, experienced,
+		// injured party, and report what a visit to each achieved
+		Character &c = _party->_activeParty[0];
+		c._experience += 2000000;
+		_party->_gold = 1000000;
+		for (uint idx = 1; idx < _party->_activeParty.size(); ++idx)
+			_party->_activeParty[idx]._currentHp = 1;
+		_interface->drawParty(true);
+
+		_locations->doAction(TEMPLE);
+		int healed = 0;
+		for (uint idx = 1; idx < _party->_activeParty.size(); ++idx)
+			healed += _party->_activeParty[idx]._currentHp == _party->_activeParty[idx].getMaxHP() ? 1 : 0;
+		debug("QoL test: %d of %u injured characters healed, gold %u", healed,
+			_party->_activeParty.size() - 1, _party->_gold);
+
+		if (!shouldExit()) {
+			debug("QoL test: level %d before training", c._level._permanent);
+			_locations->doAction(TRAINING);
+			debug("QoL test: level %d after training, gold %u", c._level._permanent, _party->_gold);
+		}
 	}
 
 	gameLoop();
