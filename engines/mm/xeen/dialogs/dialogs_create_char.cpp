@@ -378,10 +378,12 @@ void CreateCharacterDialog::rollAttributes() {
 		// Default all the attributes to zero
 		Common::fill(&_attribs[0], &_attribs[TOTAL_ATTRIBUTES], 0);
 
-		// Assign random amounts to each attribute
+		// Assign random amounts to each attribute: three dice of 1 to 7 apiece,
+		// or the best they could come up if maximum starting stats are turned on
 		for (int idx1 = 0; idx1 < 3; ++idx1) {
 			for (int idx2 = 0; idx2 < TOTAL_ATTRIBUTES; ++idx2) {
-				_attribs[idx2] += _vm->getRandomNumber(10, 79) / 10;
+				_attribs[idx2] += g_vm->_extOptions._maxStartStats ? 7 :
+					_vm->getRandomNumber(10, 79) / 10;
 			}
 		}
 

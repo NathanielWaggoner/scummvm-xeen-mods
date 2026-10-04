@@ -26,6 +26,7 @@
 #include "engines/util.h"
 #include "mm/xeen/xeen.h"
 #include "mm/xeen/locations.h"
+#include "mm/xeen/dialogs/dialogs_create_char.h"
 #include "mm/xeen/files.h"
 #include "mm/xeen/resources.h"
 
@@ -187,6 +188,7 @@ void XeenEngine::loadSettings() {
 		_extOptions._rtCombatMs = MAX(ConfMan.getInt("RealTimeCombatMs"), 250);
 
 	_extOptions._qualityOfLife = ConfMan.hasKey("QualityOfLife") && ConfMan.getBool("QualityOfLife");
+	_extOptions._maxStartStats = ConfMan.hasKey("MaxStartStats") && ConfMan.getBool("MaxStartStats");
 	_extOptions._smoothMove = ConfMan.hasKey("SmoothMove") && ConfMan.getBool("SmoothMove");
 	if (ConfMan.hasKey("SmoothMoveTileMs"))
 		_extOptions._glideTileMs = CLIP(ConfMan.getInt("SmoothMoveTileMs"), 60, 2000);
@@ -342,6 +344,11 @@ void XeenEngine::play() {
 		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
 			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
 		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
+	if (ConfMan.hasKey("TestCreateChar") && ConfMan.getBool("TestCreateChar")) {
+		// Testing aid: go straight to the character creation screen
+		CreateCharacterDialog::show(this);
 	}
 
 	if (ConfMan.hasKey("TestSell") && ConfMan.getBool("TestSell")) {

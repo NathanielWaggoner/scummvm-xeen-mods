@@ -116,6 +116,7 @@ class XeenEngine : public MMEngine {
 		uint _rtExploreMs;		// Real-time: delay between monster moves while exploring
 		uint _rtCombatMs;		// Real-time: how long a character can dither in combat
 		bool _qualityOfLife;	// Bulk training, temple heal-all and level-up markers
+		bool _maxStartStats;	// New characters get the best possible attribute rolls
 		bool _smoothMove;		// Glide between tiles rather than jumping a tile at a time
 		uint _glideTileMs;		// Smooth movement: time to cross one tile
 		uint _glideZoom;		// Smooth movement: scene magnification over one tile, in percent
@@ -129,6 +130,7 @@ class XeenEngine : public MMEngine {
 			_rtExploreMs(2000),
 			_rtCombatMs(3000),
 			_qualityOfLife(false),
+			_maxStartStats(false),
 			_smoothMove(false),
 			_glideTileMs(280),
 			_glideZoom(160),
