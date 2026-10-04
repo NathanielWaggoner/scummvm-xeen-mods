@@ -396,9 +396,11 @@ void Interface::perform() {
 
 	_glideLastTime = g_system->getMillis();
 	do {
-		// Draw the next frame
+		// Draw the next frame. With smooth movement the usual pause after drawing is
+		// instead spent in the loop below, so that a glide can keep being redrawn
+		const bool smoothMove = isGliding();
 		events.updateGameCounter();
-		draw3d(true);
+		draw3d(true, !smoothMove);
 
 		// Wait for a frame or a user event
 		_buttonValue = 0;
@@ -408,9 +410,14 @@ void Interface::perform() {
 				return;
 
 			checkEvents(g_vm);
-		} while (!_buttonValue && events.timeElapsed() < 1);
 
-		updateGlide();
+			if (smoothMove) {
+				int priorPos = _glidePos;
+				updateGlide();
+				if (_glidePos != priorPos && !_buttonValue)
+					refreshGlide();
+			}
+		} while (!_buttonValue && events.timeElapsed() < (smoothMove ? 2 : 1));
 
 		// Real-time mode: monsters keep moving while the party stands idle
 		if (!_buttonValue && _vm->_mode == MODE_INTERACTIVE && _falling == FALL_NONE
@@ -797,7 +804,9 @@ void Interface::syncGlide() {
 void Interface::updateGlide() {
 	EventsManager &events = *_vm->_events;
 	uint32 now = g_system->getMillis();
-	uint32 elapsed = now - _glideLastTime;
+	// A hitch (such as a slow scene draw) slows the glide momentarily rather than
+	// making the party lurch forward to catch up
+	uint32 elapsed = MIN<uint32>(now - _glideLastTime, 33);
 	_glideLastTime = now;
 
 	if (!isGliding())
@@ -899,15 +908,22 @@ void Interface::updateGlide() {
 	}
 }
 
-void Interface::zoomScene() {
+void Interface::zoomScene(bool captureScene) {
 	Screen &screen = *g_vm->_screen;
 	if (screen.format.bytesPerPixel != 1)
 		return;
 
-	Window &w = (*g_vm->_windows)[SCENE_WINDOW];
-	if (_glideSurface.empty())
-		_glideSurface.create(SCENE_WIDTH, SCENE_HEIGHT, screen.format);
-	_glideSurface.blitFrom(w, w.getBounds(), Common::Point(0, 0));
+	if (captureScene) {
+		Window &w = (*g_vm->_windows)[SCENE_WINDOW];
+		if (_glideSurface.empty())
+			_glideSurface.create(SCENE_WIDTH, SCENE_HEIGHT, screen.format);
+		_glideSurface.blitFrom(w, w.getBounds(), Common::Point(0, 0));
+
+		if (!_glidePos)
+			return;
+	} else if (_glideSurface.empty()) {
+		return;
+	}
 
 	// Moving a tile forward magnifies the view by the zoom factor, so part of a tile
 	// magnifies it by the matching fraction of that on a logarithmic scale
@@ -925,6 +941,39 @@ void Interface::zoomScene() {
 	}
 
 	screen.addDirtyRect(Common::Rect(8, 8, 8 + SCENE_WIDTH, 8 + SCENE_HEIGHT));
+}
+
+void Interface::refreshGlide() {
+	Combat &combat = *_vm->_combat;
+	Windows &windows = *_vm->_windows;
+
+	zoomScene(false);
+	obscureScene(_obscurity);
+
+	// The border overlaps the scene so has to be put back, but its animations
+	// should only advance when the scene is properly redrawn
+	const int uiFrames[] = {
+		_levitateUIFrame, _spotDoorsUIFrame, _dangerSenseUIFrame, _face1UIFrame, _face2UIFrame,
+		_blessedUIFrame, _powerShieldUIFrame, _holyBonusUIFrame, _heroismUIFrame
+	};
+	assembleBorder();
+	_levitateUIFrame = uiFrames[0];
+	_spotDoorsUIFrame = uiFrames[1];
+	_dangerSenseUIFrame = uiFrames[2];
+	_face1UIFrame = uiFrames[3];
+	_face2UIFrame = uiFrames[4];
+	_blessedUIFrame = uiFrames[5];
+	_powerShieldUIFrame = uiFrames[6];
+	_holyBonusUIFrame = uiFrames[7];
+	_heroismUIFrame = uiFrames[8];
+
+	if (_upDoorText && combat._attackMonsters[0] == -1)
+		windows[3].writeString(_screenText, false);
+	if (g_vm->_extOptions._realTime)
+		windows[3].writeString("\x02\f""08\x03""l\t012\v010REAL TIME\fd\x01", false);
+
+	windows[1].update();
+	windows[3].update();
 }
 
 void Interface::chargeStep() {
@@ -1578,8 +1627,7 @@ void Interface::draw3d(bool updateFlag, bool pauseFlag) {
 	drawScene();
 	if (g_vm->_extOptions._smoothMove) {
 		syncGlide();
-		if (_glidePos)
-			zoomScene();
+		zoomScene(true);
 	}
 
 	// Draw the minimap
