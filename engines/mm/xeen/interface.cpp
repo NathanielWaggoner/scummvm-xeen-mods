@@ -750,6 +750,13 @@ void Interface::perform() {
 		Quests::show(_vm);
 		break;
 
+	case Common::KEYCODE_n:
+		// Show or hide the text of map notes on the minimap. (V, which does this on
+		// the map screen, is the quests dialog here)
+		if (g_vm->_extOptions._mapNotes)
+			party._showMapNoteLabels = !party._showMapNoteLabels;
+		break;
+
 	default:
 		break;
 	}

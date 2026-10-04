@@ -245,6 +245,7 @@ Party::Party(XeenEngine *vm) {
 	_mazeId = _priorMazeId = 0;
 	_levitateCount = 0;
 	_automapOn = false;
+	_showMapNoteLabels = false;
 	_wizardEyeActive = false;
 	_clairvoyanceActive = false;
 	_walkOnWaterActive = false;

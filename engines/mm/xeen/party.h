@@ -258,6 +258,7 @@ public:
 	// Other party related runtime data
 	Roster _roster;
 	Common::Array<MapNote> _mapNotes;
+	bool _showMapNoteLabels;	// Whether the text of every map note is on show. Not saved
 	CharacterArray _activeParty;
 	bool _newDay;
 	bool _isNight;

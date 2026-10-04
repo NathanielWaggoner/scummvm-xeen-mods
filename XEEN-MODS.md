@@ -28,7 +28,7 @@ configuration file, and is off unless set.
 | `LevelUpMarker` | Marks the portrait of anyone with enough experience to train. | |
 | `SpaceConfirms` | Space and Enter answer yes on confirmation prompts. | |
 | `TabSwitchesCharacter` | Steps between characters on screens where F1-F6 pick one. | Tab / Shift+Tab |
-| `MapNotes` | Notes attached to map tiles, also marked on the minimap. | On the map: left-click adds or edits, right-click deletes, hover reads, V shows all |
+| `MapNotes` | Notes attached to map tiles, also marked on the minimap. | On the map: left-click adds or edits, right-click deletes, hover reads, V or N shows all. In the main view: N shows the text on the minimap |
 | `MapZoom` | Three zoom levels and a movable view on the map screen. | Mouse wheel or - =, drag or arrow keys |
 
 ## Installing

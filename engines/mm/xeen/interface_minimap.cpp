@@ -111,6 +111,46 @@ void InterfaceMinimap::drawMapNotes() {
 			screen.fillRect(Common::Rect(xp + 1, yp + 1, xp + 5, yp + 5), noteColor);
 		}
 	}
+
+	if (!party._showMapNoteLabels)
+		return;
+
+	// The text of each note goes just above its marker, cut down to fit: the whole
+	// minimap is only seven tiles wide
+	Window &w = (*g_vm->_windows)[1];
+	const Common::Rect area(MINIMAP_XSTART, MINIMAP_YSTART,
+		MINIMAP_XSTART + MINIMAP_SIZE * TILE_WIDTH, MINIMAP_YSTART + MINIMAP_SIZE * TILE_HEIGHT);
+	enum { LABEL_HEIGHT = 8 };
+
+	for (int row = 0; row <= MINIMAP_DIFF * 2; ++row) {
+		for (int col = 0; col <= MINIMAP_DIFF * 2; ++col) {
+			if (row == MINIMAP_DIFF && col == MINIMAP_DIFF)
+				continue;
+
+			Common::Point tile(party._mazePosition.x - MINIMAP_DIFF + col,
+				party._mazePosition.y + MINIMAP_DIFF - row);
+			int mazeId = map.mazeIdAt(tile);
+			int noteIdx = mazeId ? party.findMapNote(mazeId, map._loadCcNum, tile) : -1;
+			if (noteIdx == -1)
+				continue;
+
+			Common::String label = party._mapNotes[noteIdx]._text;
+			while (label.size() > 1 && w.getStringWidth(label, true) > area.width() - 4)
+				label.deleteLastChar();
+
+			const int xp = MINIMAP_XSTART + col * TILE_WIDTH + 2, yp = MINIMAP_YSTART + row * TILE_HEIGHT + 1;
+			const int width = w.getStringWidth(label, true);
+			const int labelX = CLIP<int>(xp + 3 - width / 2, area.left + 1, area.right - width - 2);
+			int labelY = yp - LABEL_HEIGHT - 1;
+			if (labelY < area.top)
+				labelY = yp + 7;
+
+			screen.fillRect(Common::Rect(labelX - 1, labelY - 1, labelX + width + 1, labelY + LABEL_HEIGHT),
+				outlineColor);
+			w._writePos = Common::Point(labelX, labelY);
+			w.FontSurface::writeString("\x03""l\x02\f""08" + label + "\fd\x01", area, false);
+		}
+	}
 }
 
 void InterfaceMinimap::drawOutdoorsMinimap() {

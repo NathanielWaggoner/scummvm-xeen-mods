@@ -35,10 +35,6 @@ namespace Xeen {
 #define TILE_WIDTH 10
 #define TILE_HEIGHT 8
 #define MAX_ZOOM 3
-
-// Whether the text of every map note is shown, rather than only the one under the
-// mouse. It's kept between visits to the map for as long as the game is running
-static bool showAllNoteLabels = false;
 #define LABEL_PREFIX "\x03""l\x02\f""08"
 #define LABEL_SUFFIX "\fd\x01"
 
@@ -152,8 +148,9 @@ void MapDialog::execute() {
 					if (noteIdx != -1)
 						party._mapNotes.remove_at(noteIdx);
 				}
-			} else if (canNote && event.isKeyboard() && event._keyState.keycode == Common::KEYCODE_v) {
-				showAllNoteLabels = !showAllNoteLabels;
+			} else if (canNote && event.isKeyboard() && (event._keyState.keycode == Common::KEYCODE_v
+					|| event._keyState.keycode == Common::KEYCODE_n)) {
+				party._showMapNoteLabels = !party._showMapNoteLabels;
 			} else if (canZoom && event.isKeyboard()) {
 				const int step = viewTiles() / 8;
 				switch (event._keyState.keycode) {
@@ -482,7 +479,7 @@ void MapDialog::drawNotes() {
 
 				// A note's text is only shown while the mouse is over its marker, unless
 				// all of them have been turned on
-				if (!showAllNoteLabels && !Common::Rect(xp - 1, yp - 1, xp + 7, yp + 7).contains(mousePos))
+				if (!party._showMapNoteLabels && !Common::Rect(xp - 1, yp - 1, xp + 7, yp + 7).contains(mousePos))
 					continue;
 
 				// The label sits just above the marker, centred on it where there's room
