@@ -162,6 +162,20 @@ public:
 	void synchronize(Common::Serializer &s, int ccNum);
 };
 
+/**
+ * A note the player has attached to a map tile
+ */
+struct MapNote {
+	int _mazeId;
+	int _side;
+	Common::Point _pos;
+	Common::String _text;
+
+	MapNote() : _mazeId(0), _side(0) {}
+	MapNote(int mazeId, int side, const Common::Point &pos, const Common::String &text) :
+		_mazeId(mazeId), _side(side), _pos(pos), _text(text) {}
+};
+
 class Party {
 	friend class Character;
 	friend class InventoryItems;
@@ -243,6 +257,7 @@ public:
 public:
 	// Other party related runtime data
 	Roster _roster;
+	Common::Array<MapNote> _mapNotes;
 	CharacterArray _activeParty;
 	bool _newDay;
 	bool _isNight;
@@ -262,6 +277,17 @@ public:
 	void synchronize(Common::Serializer &s);
 
 	void loadActiveParty();
+
+	/**
+	 * Returns the index of the map note on a given tile, or -1 if there isn't one
+	 */
+	int findMapNote(int mazeId, int side, const Common::Point &pos) const;
+
+	/**
+	 * Saves or loads the map notes. When loading, hasData is false for saves
+	 * that predate them
+	 */
+	void synchronizeMapNotes(Common::Serializer &s, bool hasData);
 
 	bool checkSkill(Skill skillId);
 

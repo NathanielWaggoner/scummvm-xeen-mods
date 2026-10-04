@@ -489,6 +489,13 @@ public:
 
 	int mazeLookup(const Common::Point &pt, int layerShift, int wallMask = 0xf);
 
+	/**
+	 * Works out which maze a position given relative to the current maze falls in,
+	 * adjusting the position to be relative to that maze. Returns 0 if there's no
+	 * maze there
+	 */
+	int mazeIdAt(Common::Point &pt);
+
 	void cellFlagLookup(const Common::Point &pt);
 
 	/**

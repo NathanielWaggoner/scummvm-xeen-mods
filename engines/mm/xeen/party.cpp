@@ -388,6 +388,43 @@ void Party::loadActiveParty() {
 	// No implementation needed
 }
 
+int Party::findMapNote(int mazeId, int side, const Common::Point &pos) const {
+	for (uint idx = 0; idx < _mapNotes.size(); ++idx) {
+		const MapNote &note = _mapNotes[idx];
+		if (note._mazeId == mazeId && note._side == side && note._pos == pos)
+			return idx;
+	}
+
+	return -1;
+}
+
+void Party::synchronizeMapNotes(Common::Serializer &s, bool hasData) {
+	uint32 tag = MKTAG('X', 'N', 'O', 'T');
+	uint16 count = _mapNotes.size();
+
+	if (s.isLoading())
+		_mapNotes.clear();
+	if (s.isLoading() && !hasData)
+		return;
+
+	s.syncAsUint32BE(tag);
+	if (tag != MKTAG('X', 'N', 'O', 'T'))
+		return;
+
+	s.syncAsUint16LE(count);
+	if (s.isLoading())
+		_mapNotes.resize(count);
+
+	for (uint idx = 0; idx < count; ++idx) {
+		MapNote &note = _mapNotes[idx];
+		s.syncAsSint16LE(note._mazeId);
+		s.syncAsByte(note._side);
+		s.syncAsSint16LE(note._pos.x);
+		s.syncAsSint16LE(note._pos.y);
+		s.syncString(note._text);
+	}
+}
+
 bool Party::checkSkill(Skill skillId) {
 	uint total = 0;
 	for (uint i = 0; i < _activeParty.size(); ++i) {

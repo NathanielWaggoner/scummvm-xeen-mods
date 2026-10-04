@@ -339,6 +339,12 @@ void XeenEngine::play() {
 					given ? " kit topped up" : "", items.c_str(), counts[2], counts[3]);
 			}
 
+			for (uint idx = 0; idx < _party->_mapNotes.size(); ++idx) {
+				const MapNote &note = _party->_mapNotes[idx];
+				debug("Save tool: map note in maze %d at %d, %d: %s", note._mazeId,
+					note._pos.x, note._pos.y, note._text.c_str());
+			}
+
 			if (giveKit) {
 				Common::Error err = _saves->saveGameState(slot, ConfMan.get("SaveToolDesc"), slot == 0);
 				debug("Save tool: slot %d written, result %d", slot, (int)err.getCode());
@@ -386,6 +392,18 @@ void XeenEngine::play() {
 		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
 			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
 		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
+	if (ConfMan.hasKey("TestNotes") && ConfMan.getBool("TestNotes")) {
+		// Testing aid: check that map notes survive a save and reload, then leave the
+		// game running so the map screen can be tried, reporting the notes on exit
+		_party->_mapNotes.push_back(MapNote(_party->_mazeId, _map->_loadCcNum,
+			Common::Point(3, 4), "Saved note"));
+		_saves->saveGameState(97, "Notes test");
+		_party->_mapNotes.clear();
+		_saves->loadGameState(97);
+		debug("Notes test: %u notes after reload, first is '%s'", _party->_mapNotes.size(),
+			_party->_mapNotes.empty() ? "" : _party->_mapNotes[0]._text.c_str());
 	}
 
 	if (ConfMan.hasKey("TestKit") && ConfMan.getBool("TestKit")) {
@@ -450,6 +468,13 @@ void XeenEngine::play() {
 	}
 
 	gameLoop();
+
+	if (ConfMan.hasKey("TestNotes") && ConfMan.getBool("TestNotes")) {
+		for (uint idx = 0; idx < _party->_mapNotes.size(); ++idx)
+			debug("Notes test: on exit, note at %d, %d: %s", _party->_mapNotes[idx]._pos.x,
+				_party->_mapNotes[idx]._pos.y, _party->_mapNotes[idx]._text.c_str());
+		debug("Notes test: party at %d, %d", _party->_mazePosition.x, _party->_mazePosition.y);
+	}
 
 	if (_party->_dead)
 		death();

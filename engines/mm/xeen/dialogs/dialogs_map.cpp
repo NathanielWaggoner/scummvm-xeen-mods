@@ -19,7 +19,9 @@
  *
  */
 
+#include "graphics/paletteman.h"
 #include "mm/xeen/dialogs/dialogs_map.h"
+#include "mm/xeen/dialogs/dialogs_input.h"
 #include "mm/xeen/resources.h"
 #include "mm/xeen/xeen.h"
 
@@ -75,8 +77,27 @@ void MapDialog::execute() {
 		_arrowPt.y = 69;
 	}
 
+	// Pick out marker colors for map notes from whatever palette is in use
+	byte palette[256 * 3];
+	g_system->getPaletteManager()->grabPalette(palette, 0, 256);
+	int bestLight = -1, bestDark = 0x7fffffff;
+	_noteColor = _noteOutlineColor = 0;
+	for (int idx = 0; idx < 256; ++idx) {
+		const int r = palette[idx * 3], g = palette[idx * 3 + 1], b = palette[idx * 3 + 2];
+		const int yellowness = r + g - b;
+		if (yellowness > bestLight) {
+			bestLight = yellowness;
+			_noteColor = idx;
+		}
+		if (r + g + b < bestDark) {
+			bestDark = r + g + b;
+			_noteOutlineColor = idx;
+		}
+	}
+
 	windows[5].open();
 	bool drawFlag = true;
+	bool finished = false;
 
 #ifdef USE_TTS
 	_vm->stopTextToSpeech();
@@ -93,6 +114,9 @@ void MapDialog::execute() {
 			drawOutdoors();
 		else
 			drawIndoors();
+
+		if (g_vm->_extOptions._qualityOfLife)
+			drawNotes();
 
 		windows[5].frame();
 		if (!map._isOutdoors) {
@@ -117,13 +141,97 @@ void MapDialog::execute() {
 
 		events.ipause5(2);
 		drawFlag = false;
-	} while (!_vm->shouldExit() && !events.isKeyMousePressed());
+
+		// Any key or click closes the map, other than clicks on map tiles when map
+		// notes are available: left adds or edits a note, right removes one
+		PendingEvent event;
+		while (!finished && events.getEvent(event)) {
+			int mazeId;
+			Common::Point tile, mapPos;
+			if (g_vm->_extOptions._qualityOfLife && event.isMouse()
+					&& tileAt(events._mousePos, mazeId, tile, mapPos)) {
+				events.debounceMouse();
+
+				if (event._leftButton) {
+					editNote(mazeId, tile, mapPos);
+					drawFlag = true;
+				} else {
+					int noteIdx = party.findMapNote(mazeId, map._loadCcNum, tile);
+					if (noteIdx != -1)
+						party._mapNotes.remove_at(noteIdx);
+				}
+			} else {
+				events.debounceMouse();
+				finished = true;
+			}
+		}
+	} while (!_vm->shouldExit() && !finished);
 
 #ifdef USE_TTS
 	_vm->stopTextToSpeech();
 #endif
 	events.clearEvents();
 	windows[5].close();
+}
+
+bool MapDialog::tileAt(const Common::Point &screenPos, int &mazeId, Common::Point &tile,
+		Common::Point &mapPos) {
+	const Common::Rect area(MAP_XSTART, MAP_YSTART,
+		MAP_XSTART + MAP_SIZE * TILE_WIDTH, MAP_YSTART + MAP_SIZE * TILE_HEIGHT);
+	if (!area.contains(screenPos))
+		return false;
+
+	// The map shows MAP_SIZE tiles each way, with north at the top
+	tile.x = _pt.x - (MAP_DIFF - 1) + (screenPos.x - MAP_XSTART) / TILE_WIDTH;
+	tile.y = _pt.y + (MAP_DIFF - 1) - (screenPos.y - MAP_YSTART) / TILE_HEIGHT;
+	mapPos = tile;
+	mazeId = g_vm->_map->mazeIdAt(tile);
+	return mazeId != 0;
+}
+
+void MapDialog::drawNotes() {
+	Map &map = *g_vm->_map;
+	Party &party = *g_vm->_party;
+	Screen &screen = *g_vm->_screen;
+
+	for (int row = 0; row < MAP_SIZE; ++row) {
+		for (int col = 0; col < MAP_SIZE; ++col) {
+			Common::Point tile(_pt.x - (MAP_DIFF - 1) + col, _pt.y + (MAP_DIFF - 1) - row);
+			int mazeId = map.mazeIdAt(tile);
+			if (!mazeId || party.findMapNote(mazeId, map._loadCcNum, tile) == -1)
+				continue;
+
+			// A small outlined square in the middle of the tile
+			const int xp = MAP_XSTART + col * TILE_WIDTH + 2, yp = MAP_YSTART + row * TILE_HEIGHT + 1;
+			screen.fillRect(Common::Rect(xp, yp, xp + 6, yp + 6), _noteOutlineColor);
+			screen.fillRect(Common::Rect(xp + 1, yp + 1, xp + 5, yp + 5), _noteColor);
+		}
+	}
+}
+
+void MapDialog::editNote(int mazeId, const Common::Point &tile, const Common::Point &mapPos) {
+	Map &map = *g_vm->_map;
+	Party &party = *g_vm->_party;
+	Window &w = (*g_vm->_windows)[6];
+
+	int noteIdx = party.findMapNote(mazeId, map._loadCcNum, tile);
+	Common::String text = (noteIdx == -1) ? Common::String() : party._mapNotes[noteIdx]._text;
+	const Common::String original = text;
+
+	w.open();
+	w.writeString(Common::String::format("\r\x03""cNote for %d, %d\v024\t000", mapPos.x, mapPos.y));
+	w.update();
+	int length = Input::show(g_vm, &w, text, 30, 200);
+	w.close();
+
+	// Escape or an empty entry leaves things as they were
+	if (!length || text == original)
+		return;
+
+	if (noteIdx == -1)
+		party._mapNotes.push_back(MapNote(mazeId, map._loadCcNum, tile, text));
+	else
+		party._mapNotes[noteIdx]._text = text;
 }
 
 void MapDialog::drawOutdoors() {

@@ -35,6 +35,7 @@ private:
 	SpriteResource _globalSprites;
 	Common::Point _pt, _arrowPt;
 	bool _frameEndFlag;
+	byte _noteColor, _noteOutlineColor;
 private:
 	MapDialog(XeenEngine *vm) : ButtonContainer(vm),
 		_animFrame(0), _frameEndFlag(false) {}
@@ -48,6 +49,24 @@ private:
 	 * Draws the map contents when indoors
 	 */
 	void drawIndoors();
+
+	/**
+	 * Works out which map tile is under a screen position: the maze it's in and its
+	 * position there, plus its position as the map itself numbers things. Returns
+	 * false if the position isn't over a tile of an actual maze
+	 */
+	bool tileAt(const Common::Point &screenPos, int &mazeId, Common::Point &tile,
+		Common::Point &mapPos);
+
+	/**
+	 * Draws a marker on each visible tile that has a note
+	 */
+	void drawNotes();
+
+	/**
+	 * Prompts for the text of the note on a tile, adding the note if it's new
+	 */
+	void editNote(int mazeId, const Common::Point &tile, const Common::Point &mapPos);
 
 	/**
 	 * Handles the display of the dialog

@@ -151,6 +151,7 @@ void SaveArchive::loadParty() {
 	Common::Serializer sChr(chr, nullptr);
 	_party->_roster.synchronize(sChr);
 	_party->_roster.synchronizeExtraItems(sChr, chr->size() - chr->pos() >= 5);
+	_party->synchronizeMapNotes(sChr, chr->size() - chr->pos() >= 6);
 	delete chr;
 
 	Common::SeekableReadStream *pty = createReadStreamForMember("maze.pty");
@@ -198,6 +199,7 @@ void SaveArchive::save(Common::WriteStream &s) {
 	XeenSerializer sChr(nullptr, &chr);
 	_party->_roster.synchronize(sChr);
 	_party->_roster.synchronizeExtraItems(sChr, true);
+	_party->synchronizeMapNotes(sChr, true);
 	chr.finalize();
 
 	OutFile pty("maze.pty", this);
