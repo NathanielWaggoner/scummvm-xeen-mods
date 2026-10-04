@@ -93,7 +93,7 @@ Character *ItemsDialog::show(XeenEngine *vm, Character *c, ItemsMode mode) {
  * showing beside its name so that items can be compared without identifying each one
  */
 static Common::String itemStatSummary(const XeenItem &item, ItemCategory category) {
-	if (!g_vm->_extOptions._qualityOfLife || !item._id)
+	if (!g_vm->_extOptions._itemStats || !item._id)
 		return "";
 
 	const bool isMetal = item._material >= 37 && item._material <= 58;
@@ -201,7 +201,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			lines.clear();
 
 			// Shop stock only ever fills the first page
-			const int pageCount = (c == &_itemsCharacter) ? 1 : INV_PAGES;
+			const int pageCount = (c == &_itemsCharacter) ? 1 : InventoryItems::capacity() / INV_PAGE_SIZE;
 			if (page >= pageCount)
 				page = 0;
 
@@ -478,7 +478,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 							ErrorScroll::show(_vm, Common::String::format(
 													   Res.CATEGORY_BACKPACK_IS_FULL[category], newChar->_name.c_str()));
 						else {
-							XeenItem &destItem = destItems[INV_ITEMS_TOTAL - 1];
+							XeenItem &destItem = destItems[InventoryItems::capacity() - 1];
 							destItem = srcItem;
 							srcItem.clear();
 							destItem._frame = 0;
@@ -529,7 +529,8 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 				|| Common::KEYCODE_PERIOD == _buttonValue || Common::KEYCODE_COMMA == _buttonValue) {
 			// Next/previous page of the backpack
 			bool isNext = Common::KEYCODE_PAGEDOWN == _buttonValue || Common::KEYCODE_PERIOD == _buttonValue;
-			page = (page + (isNext ? 1 : INV_PAGES - 1)) % INV_PAGES;
+			const int pages = InventoryItems::capacity() / INV_PAGE_SIZE;
+			page = (page + (isNext ? 1 : pages - 1)) % pages;
 			Common::fill(&arr[0], &arr[40], 0);
 			itemIndex = -1;
 			redrawFlag = REDRAW_FULL;
@@ -1008,7 +1009,7 @@ int ItemsDialog::doItemOptions(Character &c, int actionIndex, int itemIndex, Ite
 
 						// Add entry to the end of the list
 						XeenItem &srcItem = c._items[category][itemIndex];
-						XeenItem &destItem = _oldCharacter->_items[category][INV_ITEMS_TOTAL - 1];
+						XeenItem &destItem = _oldCharacter->_items[category][InventoryItems::capacity() - 1];
 						destItem = srcItem;
 						destItem._frame = 0;
 

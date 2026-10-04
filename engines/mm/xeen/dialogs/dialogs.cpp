@@ -116,7 +116,7 @@ bool ButtonContainer::checkEvents(XeenEngine *vm) {
 					&& keycode != Common::KEYCODE_LALT && keycode != Common::KEYCODE_RALT)
 				_buttonValue = keycode;
 
-			if (keycode == Common::KEYCODE_TAB && g_vm->_extOptions._qualityOfLife) {
+			if (keycode == Common::KEYCODE_TAB && g_vm->_extOptions._tabSwitchesChar) {
 				// Outside the main view, where Tab opens the control panel, Tab steps
 				// to the next character and Shift-Tab to the previous one, by standing
 				// in for that character's function key

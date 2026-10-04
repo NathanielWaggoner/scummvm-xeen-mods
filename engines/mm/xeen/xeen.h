@@ -115,13 +115,17 @@ class XeenEngine : public MMEngine {
 		bool _realTime;			// Monsters act on a timer rather than only when the party acts
 		uint _rtExploreMs;		// Real-time: delay between monster moves while exploring
 		uint _rtCombatMs;		// Real-time: how long a character can dither in combat
-		bool _qualityOfLife;	// Bulk training, temple heal-all and level-up markers
+		bool _largeBackpack;	// Four pages of backpack per item category instead of one
+		bool _bulkTraining;		// Training carries on through every affordable level
+		bool _templeHealAll;	// A at a temple heals the whole party
+		bool _levelUpMarker;	// Portraits of characters ready to train are marked
+		bool _itemStats;		// Weapon damage and armor class shown beside item names
+		bool _spaceConfirms;	// Space and Enter answer yes to confirmation prompts
+		bool _tabSwitchesChar;	// Tab steps between characters in dialogs
+		bool _mapNotes;			// Notes can be attached to tiles on the map screen
+		bool _mapZoom;			// The map screen can be zoomed and dragged about
 		bool _maxStartStats;	// New characters get the best possible attribute rolls
 		bool _starterKit;		// New characters get basic equipment for their class
-		bool _smoothMove;		// Glide between tiles rather than jumping a tile at a time
-		uint _glideTileMs;		// Smooth movement: time to cross one tile
-		uint _glideZoom;		// Smooth movement: scene magnification over one tile, in percent
-		int _glideHorizon;		// Smooth movement: row within the scene that the zoom centres on
 
 		ExtendedOptions() :
 			_showItemCosts(false),
@@ -130,13 +134,17 @@ class XeenEngine : public MMEngine {
 			_realTime(false),
 			_rtExploreMs(2000),
 			_rtCombatMs(3000),
-			_qualityOfLife(false),
+			_largeBackpack(false),
+			_bulkTraining(false),
+			_templeHealAll(false),
+			_levelUpMarker(false),
+			_itemStats(false),
+			_spaceConfirms(false),
+			_tabSwitchesChar(false),
+			_mapNotes(false),
+			_mapZoom(false),
 			_maxStartStats(false),
-			_starterKit(false),
-			_smoothMove(false),
-			_glideTileMs(280),
-			_glideZoom(160),
-			_glideHorizon(62)
+			_starterKit(false)
 		{}
 	};
 private:

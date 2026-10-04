@@ -1257,7 +1257,7 @@ Character *TempleLocation::doOptions(Character *c) {
 			sound.stopSound();
 			sound.playSound("ahh.voc", 1);
 		}
-	} else if (Common::KEYCODE_a == _buttonValue && g_vm->_extOptions._qualityOfLife) {
+	} else if (Common::KEYCODE_a == _buttonValue && g_vm->_extOptions._templeHealAll) {
 		// Heal everyone who needs it, for as long as the gold lasts
 		bool healedAny = false;
 		for (uint idx = 0; idx < party._activeParty.size(); ++idx) {
@@ -1442,7 +1442,7 @@ Character *TrainingLocation::doOptions(Character *c) {
 
 				// Carry on through any further levels the character has the experience
 				// and the party has the gold for, rather than needing a press for each
-				while (g_vm->_extOptions._qualityOfLife && !c->experienceToNextLevel()
+				while (g_vm->_extOptions._bulkTraining && !c->experienceToNextLevel()
 						&& c->_level._permanent < maxLevel()) {
 					uint cost = c->_level._permanent * c->_level._permanent * 10;
 					if (party._gold < cost)
@@ -2802,10 +2802,10 @@ bool LocationMessage::execute(int portrait, const Common::String &name, const Co
 			return false;
 		}
 
-		// With the quality of life option the space bar and Enter answer yes. A click on
+		// With the space-confirms option the space bar and Enter answer yes. A click on
 		// the scene is reported as the space bar, so that has to be switched off while
 		// an actual question is showing, or a stray click would answer it
-		const bool spaceConfirms = g_vm->_extOptions._qualityOfLife && !msgEnd && !confirm;
+		const bool spaceConfirms = g_vm->_extOptions._spaceConfirms && !msgEnd && !confirm;
 		if (spaceConfirms)
 			_waitBounds = Common::Rect();
 		else

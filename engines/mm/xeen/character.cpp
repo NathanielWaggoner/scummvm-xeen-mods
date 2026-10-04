@@ -196,8 +196,8 @@ void Character::giveStarterKit() {
 		for (const int *id = WEAPON_SETS[setIdx]; *id && !hasOne; ++id) {
 			if (_weapons.passRestrictions(*id, true)) {
 				if (!_weapons.isFull()) {
-					_weapons[INV_ITEMS_TOTAL - 1].clear();
-					_weapons[INV_ITEMS_TOTAL - 1]._id = *id;
+					_weapons[InventoryItems::capacity() - 1].clear();
+					_weapons[InventoryItems::capacity() - 1]._id = *id;
 					_weapons.sort();
 				}
 				break;
@@ -219,8 +219,8 @@ void Character::giveStarterKit() {
 		for (const int *id = ARMOR_SETS[setIdx]; *id && !hasOne; ++id) {
 			if (_armor.passRestrictions(*id, true)) {
 				if (!_armor.isFull()) {
-					_armor[INV_ITEMS_TOTAL - 1].clear();
-					_armor[INV_ITEMS_TOTAL - 1]._id = *id;
+					_armor[InventoryItems::capacity() - 1].clear();
+					_armor[InventoryItems::capacity() - 1]._id = *id;
 					_armor.sort();
 				}
 				break;

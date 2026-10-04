@@ -102,11 +102,11 @@ void MapDialog::execute() {
 		}
 	}
 
-	// Start with the standard view. With the quality of life option it can then be
-	// zoomed and moved about
+	// Start with the standard view. With the map zoom option it can then be zoomed
+	// and moved about, and with the map notes option tiles can be given notes
 	_zoom = 1;
 	_view = Common::Point(_pt.x - (MAP_DIFF - 1), _pt.y + (MAP_DIFF - 1));
-	const bool enhanced = g_vm->_extOptions._qualityOfLife;
+	const bool canZoom = g_vm->_extOptions._mapZoom, canNote = g_vm->_extOptions._mapNotes;
 
 	windows[5].open();
 	bool drawFlag = true;
@@ -129,7 +129,7 @@ void MapDialog::execute() {
 
 		// The mouse wheel zooms, with wheel-up zooming in
 		int wheel = events.takeWheelDelta();
-		if (enhanced && wheel)
+		if (canZoom && wheel)
 			setZoom(_zoom - wheel);
 
 		// Otherwise any key or click closes the map, apart from the enhanced controls:
@@ -141,17 +141,20 @@ void MapDialog::execute() {
 			int mazeId;
 			Common::Point tile, mapPos;
 
-			if (enhanced && event.isMouse() && tileAt(events._mousePos, mazeId, tile, mapPos)) {
+			if ((canZoom || canNote) && event.isMouse()
+					&& tileAt(events._mousePos, mazeId, tile, mapPos)) {
 				if (event._leftButton) {
 					if (dragOrClick())
 						drawFlag = true;
 				} else {
 					events.debounceMouse();
-					int noteIdx = party.findMapNote(mazeId, map._loadCcNum, tile);
+					int noteIdx = canNote ? party.findMapNote(mazeId, map._loadCcNum, tile) : -1;
 					if (noteIdx != -1)
 						party._mapNotes.remove_at(noteIdx);
 				}
-			} else if (enhanced && event.isKeyboard()) {
+			} else if (canNote && event.isKeyboard() && event._keyState.keycode == Common::KEYCODE_v) {
+				showAllNoteLabels = !showAllNoteLabels;
+			} else if (canZoom && event.isKeyboard()) {
 				const int step = viewTiles() / 8;
 				switch (event._keyState.keycode) {
 				case Common::KEYCODE_MINUS:
@@ -174,9 +177,6 @@ void MapDialog::execute() {
 					break;
 				case Common::KEYCODE_DOWN:
 					panView(0, -step);
-					break;
-				case Common::KEYCODE_v:
-					showAllNoteLabels = !showAllNoteLabels;
 					break;
 				default:
 					finished = true;
@@ -343,13 +343,14 @@ void MapDialog::render(bool &ttsVoiceText) {
 	Map &map = *g_vm->_map;
 	Party &party = *g_vm->_party;
 	Windows &windows = *g_vm->_windows;
-	const bool enhanced = g_vm->_extOptions._qualityOfLife;
+	const bool enhanced = g_vm->_extOptions._mapZoom || g_vm->_extOptions._mapNotes;
 
 	windows[5].writeString("\r");
 
 	if (enhanced) {
 		drawView();
-		drawNotes();
+		if (g_vm->_extOptions._mapNotes)
+			drawNotes();
 	} else if (map._isOutdoors) {
 		drawOutdoors();
 	} else {
@@ -404,7 +405,7 @@ bool MapDialog::dragOrClick() {
 		events.pollEventsAndWait();
 
 		const Common::Point moved = events._mousePos - startMouse;
-		if (!dragging && (ABS(moved.x) > 3 || ABS(moved.y) > 3))
+		if (!dragging && g_vm->_extOptions._mapZoom && (ABS(moved.x) > 3 || ABS(moved.y) > 3))
 			dragging = true;
 
 		if (dragging) {
@@ -419,7 +420,7 @@ bool MapDialog::dragOrClick() {
 	}
 	events.clearEvents();
 
-	if (dragging)
+	if (dragging || !g_vm->_extOptions._mapNotes)
 		return false;
 
 	int mazeId;

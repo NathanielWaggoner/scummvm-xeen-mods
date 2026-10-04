@@ -811,7 +811,7 @@ void Party::giveTreasure() {
 			if (arePacksFull()) {
 				if (_treasure._weapons[itemNum]._id >= XEEN_SLAYER_SWORD) {
 					// Xeen Slayer Sword, so clear a slot for it
-					_activeParty[0]._weapons[INV_ITEMS_TOTAL - 1].clear();
+					_activeParty[0]._weapons[InventoryItems::capacity() - 1].clear();
 				} else {
 					// Otherwise, clear all the remaining treasure items,
 					// since all the party's packs are full
@@ -889,10 +889,10 @@ bool Party::arePacksFull() const {
 	uint total = 0;
 	for (uint idx = 0; idx < _activeParty.size(); ++idx) {
 		const Character &c = _activeParty[idx];
-		total += (c._weapons[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1)
-			+ (c._armor[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1)
-			+ (c._accessories[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1)
-			+ (c._misc[INV_ITEMS_TOTAL - 1].empty() ? 0 : 1);
+		total += (c._weapons[InventoryItems::capacity() - 1].empty() ? 0 : 1)
+			+ (c._armor[InventoryItems::capacity() - 1].empty() ? 0 : 1)
+			+ (c._accessories[InventoryItems::capacity() - 1].empty() ? 0 : 1)
+			+ (c._misc[InventoryItems::capacity() - 1].empty() ? 0 : 1);
 	}
 
 	return total == (_activeParty.size() * NUM_ITEM_CATEGORIES);
@@ -915,7 +915,7 @@ void Party::giveTreasureToCharacter(Character &c, ItemCategory category, int ite
 
 	if (treasureItem._id < 82) {
 		// Copy item into the character's inventory
-		c._items[category][INV_ITEMS_TOTAL - 1] = treasureItem;
+		c._items[category][InventoryItems::capacity() - 1] = treasureItem;
 	}
 
 	w.writeString(Res.GIVE_TREASURE_FORMATTING);

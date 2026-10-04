@@ -187,16 +187,25 @@ void XeenEngine::loadSettings() {
 	if (ConfMan.hasKey("RealTimeCombatMs"))
 		_extOptions._rtCombatMs = MAX(ConfMan.getInt("RealTimeCombatMs"), 250);
 
-	_extOptions._qualityOfLife = ConfMan.hasKey("QualityOfLife") && ConfMan.getBool("QualityOfLife");
+	// Each mod has its own setting. Configurations from before they were split up
+	// had a single QualityOfLife setting, which stands in for any that are missing
+	const bool legacy = ConfMan.hasKey("QualityOfLife") && ConfMan.getBool("QualityOfLife");
+	struct { const char *_key; bool *_option; } const MODS[] = {
+		{ "LargeBackpack", &_extOptions._largeBackpack },
+		{ "BulkTraining", &_extOptions._bulkTraining },
+		{ "TempleHealAll", &_extOptions._templeHealAll },
+		{ "LevelUpMarker", &_extOptions._levelUpMarker },
+		{ "ItemStats", &_extOptions._itemStats },
+		{ "SpaceConfirms", &_extOptions._spaceConfirms },
+		{ "TabSwitchesCharacter", &_extOptions._tabSwitchesChar },
+		{ "MapNotes", &_extOptions._mapNotes },
+		{ "MapZoom", &_extOptions._mapZoom }
+	};
+	for (uint idx = 0; idx < ARRAYSIZE(MODS); ++idx)
+		*MODS[idx]._option = ConfMan.hasKey(MODS[idx]._key) ? ConfMan.getBool(MODS[idx]._key) : legacy;
+
 	_extOptions._maxStartStats = ConfMan.hasKey("MaxStartStats") && ConfMan.getBool("MaxStartStats");
 	_extOptions._starterKit = ConfMan.hasKey("StarterKit") && ConfMan.getBool("StarterKit");
-	_extOptions._smoothMove = ConfMan.hasKey("SmoothMove") && ConfMan.getBool("SmoothMove");
-	if (ConfMan.hasKey("SmoothMoveTileMs"))
-		_extOptions._glideTileMs = CLIP(ConfMan.getInt("SmoothMoveTileMs"), 60, 2000);
-	if (ConfMan.hasKey("SmoothMoveZoom"))
-		_extOptions._glideZoom = CLIP(ConfMan.getInt("SmoothMoveZoom"), 100, 300);
-	if (ConfMan.hasKey("SmoothMoveHorizon"))
-		_extOptions._glideHorizon = CLIP(ConfMan.getInt("SmoothMoveHorizon"), 0, 131);
 
 	// If requested, load a savegame instead of showing the intro
 	if (ConfMan.hasKey("save_slot")) {

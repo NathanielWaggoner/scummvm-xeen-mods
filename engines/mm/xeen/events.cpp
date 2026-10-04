@@ -32,7 +32,7 @@ namespace MM {
 namespace Xeen {
 
 EventsManager::EventsManager(XeenEngine *vm) : _vm(vm), _playTime(0), _gameCounter(0),
-		_moveFwdHeld(false), _moveBackHeld(false), _wheelDelta(0),
+		_wheelDelta(0),
 		_frameCounter(0), _priorFrameCounterTime(0), _priorScreenRefreshTime(0),
 		_mousePressed(false), _sprites("mouse.icn") {
 	Common::fill(&_gameCounters[0], &_gameCounters[6], 0);
@@ -85,19 +85,8 @@ void EventsManager::pollEvents() {
 		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
 		case Common::EVENT_KEYDOWN:
-		case Common::EVENT_KEYUP:
-			if (!(event.kbd.flags & (Common::KBD_CTRL | Common::KBD_ALT))) {
-				bool isDown = event.type == Common::EVENT_KEYDOWN;
-				if (event.kbd.keycode == Common::KEYCODE_UP || event.kbd.keycode == Common::KEYCODE_KP8)
-					_moveFwdHeld = isDown;
-				else if (event.kbd.keycode == Common::KEYCODE_DOWN || event.kbd.keycode == Common::KEYCODE_KP2)
-					_moveBackHeld = isDown;
-			}
-			if (event.type == Common::EVENT_KEYDOWN && !isModifierKey(event.kbd.keycode))
+			if (!isModifierKey(event.kbd.keycode))
 				addEvent(event.kbd);
-			break;
-		case Common::EVENT_FOCUS_LOST:
-			_moveFwdHeld = _moveBackHeld = false;
 			break;
 		case Common::EVENT_MOUSEMOVE:
 			_mousePos = event.mouse;

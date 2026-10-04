@@ -225,6 +225,12 @@ public:
 	bool passRestrictions(int itemId, bool suppressError = false) const;
 
 	/**
+	 * Returns how many backpack slots are in use per category: the original nine,
+	 * or all of them with the large backpack option
+	 */
+	static int capacity();
+
+	/**
 	 * Return the bare name of a given inventory item
 	 */
 	Common::String getName(int itemIndex);
