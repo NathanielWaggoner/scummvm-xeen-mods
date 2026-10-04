@@ -35,6 +35,10 @@ namespace Xeen {
 #define TILE_WIDTH 10
 #define TILE_HEIGHT 8
 #define MAX_ZOOM 3
+
+// Whether the text of every map note is shown, rather than only the one under the
+// mouse. It's kept between visits to the map for as long as the game is running
+static bool showAllNoteLabels = false;
 #define LABEL_PREFIX "\x03""l\x02\f""08"
 #define LABEL_SUFFIX "\fd\x01"
 
@@ -130,7 +134,8 @@ void MapDialog::execute() {
 
 		// Otherwise any key or click closes the map, apart from the enhanced controls:
 		// dragging moves the view, a left click on a tile adds or edits a note, a right
-		// click removes one, plus/minus zoom and the arrow keys move the view
+		// click removes one, plus/minus zoom, the arrow keys move the view, and V
+		// switches the text of all the notes on and off
 		PendingEvent event;
 		while (!finished && events.getEvent(event)) {
 			int mazeId;
@@ -169,6 +174,9 @@ void MapDialog::execute() {
 					break;
 				case Common::KEYCODE_DOWN:
 					panView(0, -step);
+					break;
+				case Common::KEYCODE_v:
+					showAllNoteLabels = !showAllNoteLabels;
 					break;
 				default:
 					finished = true;
@@ -450,6 +458,7 @@ void MapDialog::drawNotes() {
 		MAP_XSTART + MAP_SIZE * TILE_WIDTH, MAP_YSTART + MAP_SIZE * TILE_HEIGHT);
 	enum { MAX_LABEL_CHARS = 24, LABEL_HEIGHT = 8 };
 	const int tiles = viewTiles();
+	const Common::Point mousePos = g_vm->_events->_mousePos;
 
 	// Markers first, then the labels, so that a label is never hidden by a marker
 	for (int pass = 0; pass < 2; ++pass) {
@@ -469,6 +478,11 @@ void MapDialog::drawNotes() {
 					screen.fillRect(Common::Rect(xp + 1, yp + 1, xp + 5, yp + 5), _noteColor);
 					continue;
 				}
+
+				// A note's text is only shown while the mouse is over its marker, unless
+				// all of them have been turned on
+				if (!showAllNoteLabels && !Common::Rect(xp - 1, yp - 1, xp + 7, yp + 7).contains(mousePos))
+					continue;
 
 				// The label sits just above the marker, centred on it where there's room
 				// and otherwise pushed back inside the grid. Long notes are cut short
