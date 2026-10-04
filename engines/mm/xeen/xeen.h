@@ -115,6 +115,10 @@ class XeenEngine : public MMEngine {
 		bool _realTime;			// Monsters act on a timer rather than only when the party acts
 		uint _rtExploreMs;		// Real-time: delay between monster moves while exploring
 		uint _rtCombatMs;		// Real-time: how long a character can dither in combat
+		bool _smoothMove;		// Glide between tiles rather than jumping a tile at a time
+		uint _glideTileMs;		// Smooth movement: time to cross one tile
+		uint _glideZoom;		// Smooth movement: scene magnification over one tile, in percent
+		int _glideHorizon;		// Smooth movement: row within the scene that the zoom centres on
 
 		ExtendedOptions() :
 			_showItemCosts(false),
@@ -122,7 +126,11 @@ class XeenEngine : public MMEngine {
 			_showHpSpBars(false),
 			_realTime(false),
 			_rtExploreMs(2000),
-			_rtCombatMs(3000)
+			_rtCombatMs(3000),
+			_smoothMove(false),
+			_glideTileMs(280),
+			_glideZoom(160),
+			_glideHorizon(62)
 		{}
 	};
 private:

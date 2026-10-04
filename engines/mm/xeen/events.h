@@ -81,6 +81,7 @@ private:
 	bool isModifierKey(const Common::KeyCode &keycode) const;
 public:
 	Common::Point _mousePos;
+	bool _moveFwdHeld, _moveBackHeld;	// Forward/back keys currently held down (smooth movement)
 public:
 	EventsManager(XeenEngine *vm);
 	~EventsManager();

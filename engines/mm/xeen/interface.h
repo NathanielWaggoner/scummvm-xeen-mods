@@ -115,6 +115,20 @@ private:
 	int _flipUIFrame;
 	uint32 _rtNextTick;
 
+	// Smooth movement. The party can stand anywhere between the centre of its current
+	// tile and the centre of the tile ahead: _glidePos is how far along it is, in 256ths
+	int _glidePos;
+	int _glideTarget;			// Position being moved to automatically, or GLIDE_NO_TARGET
+	int _glidePendingPos;		// Position to adopt once the step being made is complete
+	int _glideQueuedKey;		// Turn/strafe key waiting for the party to reach a tile centre
+	bool _glideCommit;			// Set when the next step was already checked by the glide code
+	uint32 _glideLastTime;
+	uint32 _glideBlockedTime;
+	Common::Point _glideTile;
+	Direction _glideDir;
+	int _glideMazeId;
+	Graphics::ManagedSurface _glideSurface;
+
 	void loadSprites();
 
 	/**
@@ -129,6 +143,29 @@ private:
 	bool realTimeElapsed(uint intervalMs);
 
 	void resetRealTimeTimer() { _rtNextTick = 0; }
+
+	/**
+	 * Returns true if smooth movement applies right now
+	 */
+	bool isGliding() const;
+
+	/**
+	 * Drops any part-tile offset if the party has been moved or turned by something
+	 * other than the glide code
+	 */
+	void syncGlide();
+
+	/**
+	 * Called once per frame while waiting for input. Advances the party's position
+	 * within the tile, consuming movement keys and substituting the original
+	 * whole-tile step when a tile boundary is crossed
+	 */
+	void updateGlide();
+
+	/**
+	 * Magnifies the freshly drawn scene to match the party's position within the tile
+	 */
+	void zoomScene();
 
 	void setupBackground();
 

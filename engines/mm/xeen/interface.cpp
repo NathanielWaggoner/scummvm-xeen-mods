@@ -56,6 +56,10 @@ enum {
 	RT_SKIP_TURN = -1
 };
 
+enum {
+	GLIDE_TILE = 256, GLIDE_NO_TARGET = -9999
+};
+
 enum CombatButtonTTSTextIndex {
 	kCombatMonster1 = 0,
 	kCombatMonster2 = 1,
@@ -278,6 +282,14 @@ Interface::Interface(XeenEngine *vm) : ButtonContainer(vm), InterfaceScene(vm),
 	_upDoorText = false;
 	_tillMove = 0;
 	_rtNextTick = 0;
+	_glidePos = 0;
+	_glideTarget = GLIDE_NO_TARGET;
+	_glidePendingPos = -1;
+	_glideQueuedKey = 0;
+	_glideCommit = false;
+	_glideLastTime = _glideBlockedTime = 0;
+	_glideDir = DIR_NORTH;
+	_glideMazeId = -1;
 	_iconsMode = ICONS_STANDARD;
 	Common::fill(&_charFX[0], &_charFX[MAX_ACTIVE_PARTY], 0);
 	setWaitBounds();
@@ -382,6 +394,7 @@ void Interface::perform() {
 	Scripts &scripts = *_vm->_scripts;
 	Sound &sound = *_vm->_sound;
 
+	_glideLastTime = g_system->getMillis();
 	do {
 		// Draw the next frame
 		events.updateGameCounter();
@@ -396,6 +409,8 @@ void Interface::perform() {
 
 			checkEvents(g_vm);
 		} while (!_buttonValue && events.timeElapsed() < 1);
+
+		updateGlide();
 
 		// Real-time mode: monsters keep moving while the party stands idle
 		if (!_buttonValue && _vm->_mode == MODE_INTERACTIVE && _falling == FALL_NONE
@@ -726,6 +741,18 @@ void Interface::perform() {
 	default:
 		break;
 	}
+
+	// After a step made by the glide code, pick up from the right place within the
+	// new tile: its centre going forwards, or just short of the tile left going back
+	if (_glidePendingPos >= 0) {
+		_glidePos = _glidePendingPos;
+		_glidePendingPos = -1;
+		_glideTile = party._mazePosition;
+		_glideDir = party._mazeDirection;
+		_glideMazeId = party._mazeId;
+	}
+	_glideCommit = false;
+
 }
 
 void Interface::toggleRealTime() {
@@ -747,6 +774,157 @@ bool Interface::realTimeElapsed(uint intervalMs) {
 	}
 
 	return now >= _rtNextTick;
+}
+
+bool Interface::isGliding() const {
+	return g_vm->_extOptions._smoothMove && _vm->_mode == MODE_INTERACTIVE
+		&& _falling == FALL_NONE && !_vm->_party->_dead;
+}
+
+void Interface::syncGlide() {
+	Party &party = *_vm->_party;
+
+	if (party._mazePosition != _glideTile || party._mazeDirection != _glideDir
+			|| party._mazeId != _glideMazeId) {
+		_glideTile = party._mazePosition;
+		_glideDir = party._mazeDirection;
+		_glideMazeId = party._mazeId;
+		_glidePos = 0;
+		_glideTarget = GLIDE_NO_TARGET;
+	}
+}
+
+void Interface::updateGlide() {
+	EventsManager &events = *_vm->_events;
+	uint32 now = g_system->getMillis();
+	uint32 elapsed = now - _glideLastTime;
+	_glideLastTime = now;
+
+	if (!isGliding())
+		return;
+	syncGlide();
+
+	const int key = _buttonValue;
+	if (key == Common::KEYCODE_UP || key == Common::KEYCODE_DOWN) {
+		// Movement is driven by the keys being held. A press that isn't held is a click
+		// on the on-screen arrows (or a very quick tap), which moves a whole tile
+		_buttonValue = 0;
+		if (key == Common::KEYCODE_UP && !events._moveFwdHeld)
+			_glideTarget = GLIDE_TILE;
+		else if (key == Common::KEYCODE_DOWN && !events._moveBackHeld)
+			_glideTarget = _glidePos ? 0 : -GLIDE_TILE;
+	} else if (key && _glidePos) {
+		switch (key) {
+		case Common::KEYCODE_LEFT:
+		case Common::KEYCODE_RIGHT:
+		case Common::KEYCODE_KP4:
+		case Common::KEYCODE_KP6:
+		case Common::KEYCODE_KP7:
+		case Common::KEYCODE_KP9:
+		case (Common::KBD_CTRL << 16) | Common::KEYCODE_LEFT:
+		case (Common::KBD_CTRL << 16) | Common::KEYCODE_RIGHT:
+		case (Common::KBD_CTRL << 16) | Common::KEYCODE_DOWN:
+			// Turning and sidestepping happen at a tile centre, so finish moving to the
+			// nearest one first and then carry out the key
+			_glideQueuedKey = key;
+			_glideTarget = (_glidePos >= GLIDE_TILE / 2) ? GLIDE_TILE : 0;
+			_buttonValue = 0;
+			break;
+		default:
+			_glideTarget = GLIDE_NO_TARGET;
+			return;
+		}
+	} else if (key) {
+		_glideTarget = GLIDE_NO_TARGET;
+		return;
+	}
+
+	int direction = 0;
+	if (_glideTarget != GLIDE_NO_TARGET)
+		direction = (_glideTarget > _glidePos) ? 1 : -1;
+	else if (events._moveFwdHeld)
+		direction = 1;
+	else if (events._moveBackHeld)
+		direction = -1;
+	if (!direction || now < _glideBlockedTime)
+		return;
+
+	int step = CLIP<int>(elapsed * GLIDE_TILE / g_vm->_extOptions._glideTileMs, 1, GLIDE_TILE / 3);
+
+	if (direction > 0) {
+		if (!_glidePos) {
+			// Leaving the tile centre, so make sure the way ahead is clear
+			_buttonValue = Common::KEYCODE_UP;
+			bool canMove = checkMoveDirection(Common::KEYCODE_UP);
+			_buttonValue = 0;
+			if (!canMove) {
+				_glideTarget = GLIDE_NO_TARGET;
+				_glideBlockedTime = now + 400;
+				return;
+			}
+		}
+
+		_glidePos += step;
+		if (_glidePos >= GLIDE_TILE) {
+			// Arrived at the next tile, so make the actual step
+			_glidePos = 0;
+			_glideTarget = GLIDE_NO_TARGET;
+			_glideCommit = true;
+			_glidePendingPos = 0;
+			_buttonValue = Common::KEYCODE_UP;
+		}
+	} else if (_glidePos) {
+		_glidePos = MAX(_glidePos - step, 0);
+		if (!_glidePos && _glideTarget == 0)
+			_glideTarget = GLIDE_NO_TARGET;
+	} else {
+		// Backing away from a tile centre
+		if (!checkMoveDirection(Common::KEYCODE_DOWN)) {
+			_glideTarget = GLIDE_NO_TARGET;
+			_glideBlockedTime = now + 400;
+			return;
+		}
+
+		_glideCommit = true;
+		_glidePendingPos = GLIDE_TILE - step;
+		if (_glideTarget != GLIDE_NO_TARGET)
+			_glideTarget = 0;
+		_buttonValue = Common::KEYCODE_DOWN;
+	}
+
+	// Once the party is back on a tile centre, any waiting turn or sidestep can go ahead
+	if (!_glidePos && !_buttonValue && _glideQueuedKey) {
+		_buttonValue = _glideQueuedKey;
+		_glideQueuedKey = 0;
+	}
+}
+
+void Interface::zoomScene() {
+	Screen &screen = *g_vm->_screen;
+	if (screen.format.bytesPerPixel != 1)
+		return;
+
+	Window &w = (*g_vm->_windows)[SCENE_WINDOW];
+	if (_glideSurface.empty())
+		_glideSurface.create(SCENE_WIDTH, SCENE_HEIGHT, screen.format);
+	_glideSurface.blitFrom(w, w.getBounds(), Common::Point(0, 0));
+
+	// Moving a tile forward magnifies the view by the zoom factor, so part of a tile
+	// magnifies it by the matching fraction of that on a logarithmic scale
+	const double zoom = pow(g_vm->_extOptions._glideZoom / 100.0, (double)_glidePos / GLIDE_TILE);
+	const int inverse = (int)(65536.0 / zoom);
+	const int centreX = SCENE_WIDTH / 2, centreY = g_vm->_extOptions._glideHorizon;
+
+	for (int y = 0; y < SCENE_HEIGHT; ++y) {
+		int srcY = centreY + (((y - centreY) * inverse) >> 16);
+		const byte *src = (const byte *)_glideSurface.getBasePtr(0, srcY);
+		byte *dest = (byte *)screen.getBasePtr(8, 8 + y);
+
+		for (int x = 0; x < SCENE_WIDTH; ++x)
+			dest[x] = src[centreX + (((x - centreX) * inverse) >> 16)];
+	}
+
+	screen.addDirtyRect(Common::Rect(8, 8, 8 + SCENE_WIDTH, 8 + SCENE_HEIGHT));
 }
 
 void Interface::chargeStep() {
@@ -1081,6 +1259,13 @@ bool Interface::checkMoveDirection(int key) {
 	if (debugger._intangible)
 		return true;
 
+	// The glide code checks a step as it starts, so don't repeat the check (and any
+	// door opening or bump sound) when the step is finally made
+	if (_glideCommit) {
+		_glideCommit = false;
+		return true;
+	}
+
 	// For strafing or moving backwards, temporarily move to face the direction being checked,
 	// since the call to getCell will the adjacent cell details in the direction being faced
 	Direction dir = party._mazeDirection;
@@ -1391,6 +1576,11 @@ void Interface::draw3d(bool updateFlag, bool pauseFlag) {
 
 	// Draw the game scene
 	drawScene();
+	if (g_vm->_extOptions._smoothMove) {
+		syncGlide();
+		if (_glidePos)
+			zoomScene();
+	}
 
 	// Draw the minimap
 	drawMinimap();

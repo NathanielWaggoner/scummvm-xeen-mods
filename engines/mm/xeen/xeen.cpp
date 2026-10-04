@@ -185,6 +185,14 @@ void XeenEngine::loadSettings() {
 	if (ConfMan.hasKey("RealTimeCombatMs"))
 		_extOptions._rtCombatMs = MAX(ConfMan.getInt("RealTimeCombatMs"), 250);
 
+	_extOptions._smoothMove = ConfMan.hasKey("SmoothMove") && ConfMan.getBool("SmoothMove");
+	if (ConfMan.hasKey("SmoothMoveTileMs"))
+		_extOptions._glideTileMs = CLIP(ConfMan.getInt("SmoothMoveTileMs"), 60, 2000);
+	if (ConfMan.hasKey("SmoothMoveZoom"))
+		_extOptions._glideZoom = CLIP(ConfMan.getInt("SmoothMoveZoom"), 100, 300);
+	if (ConfMan.hasKey("SmoothMoveHorizon"))
+		_extOptions._glideHorizon = CLIP(ConfMan.getInt("SmoothMoveHorizon"), 0, 131);
+
 	// If requested, load a savegame instead of showing the intro
 	if (ConfMan.hasKey("save_slot")) {
 		int saveSlot = ConfMan.getInt("save_slot");
