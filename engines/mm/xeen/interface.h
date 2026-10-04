@@ -169,17 +169,9 @@ private:
 	void updateGlide();
 
 	/**
-	 * Keeps a copy of the freshly drawn scene, and magnifies what's on screen to match
-	 * the party's position within the tile
+	 * Magnifies the freshly drawn scene to match the party's position within the tile
 	 */
-	void zoomScene(bool captureScene);
-
-	/**
-	 * Redraws the view for the party's current position within the tile from the scene
-	 * last drawn, without advancing any of the game's animations. This lets a glide be
-	 * shown at a far higher rate than the game's own frame rate
-	 */
-	void refreshGlide();
+	void zoomScene();
 
 	void setupBackground();
 
