@@ -355,6 +355,65 @@ void XeenEngine::play() {
 					note._pos.x, note._pos.y, note._text.c_str());
 			}
 
+			if (ConfMan.get("SaveToolMode") == "events") {
+				// Lists the scripts on the current map that mention a word, in full
+				Common::String word = ConfMan.get("SaveToolName");
+				word.toLowercase();
+				MazeEvents &events = _map->_events;
+				debug("Save tool: map %d (%s), party at %d, %d, %u events, %u texts", _party->_mazeId,
+					_map->_mazeName.c_str(), _party->_mazePosition.x, _party->_mazePosition.y,
+					events.size(), events._text.size());
+
+				Common::Array<Common::Point> spots;
+				for (uint idx = 0; idx < events._text.size() && word == "all"; ++idx)
+					debug("Save tool: text %u: %s", idx, events._text[idx].c_str());
+
+				for (uint idx = 0; idx < events.size(); ++idx) {
+					const MazeEvent &e = events[idx];
+					if (word == "all") {
+						if (Common::find(spots.begin(), spots.end(), e._position) == spots.end())
+							spots.push_back(e._position);
+						continue;
+					}
+
+					bool isText = e._opcode == OP_Display0x01 || e._opcode == OP_DoorTextSml
+						|| e._opcode == OP_DoorTextLrg || e._opcode == OP_SignText || e._opcode == OP_NPC
+						|| e._opcode == OP_DisplayStat || e._opcode == OP_DisplayBottom
+						|| e._opcode == OP_DisplayLarge || e._opcode == OP_DisplayMain
+						|| e._opcode == OP_WhoWill || e._opcode == OP_DisplayBottomTwoLines;
+					if (!isText || e._parameters.empty())
+						continue;
+
+					for (uint p = 0; p < e._parameters.size(); ++p) {
+						if (e._parameters[p] >= events._text.size())
+							continue;
+						Common::String text = events._text[e._parameters[p]];
+						text.toLowercase();
+						if (text.contains(word) && Common::find(spots.begin(), spots.end(), e._position) == spots.end())
+							spots.push_back(e._position);
+					}
+				}
+
+				for (uint spot = 0; spot < spots.size(); ++spot) {
+					debug("Save tool: --- script at %d, %d", spots[spot].x, spots[spot].y);
+					for (uint idx = 0; idx < events.size(); ++idx) {
+						const MazeEvent &e = events[idx];
+						if (e._position != spots[spot])
+							continue;
+
+						Common::String params;
+						for (uint p = 0; p < e._parameters.size(); ++p)
+							params += Common::String::format("%d ", e._parameters[p]);
+						Common::String text;
+						if (!e._parameters.empty() && e._parameters[0] < events._text.size()
+								&& (e._opcode <= OP_NPC || e._opcode == OP_WhoWill || e._opcode >= OP_DisplayStat))
+							text = events._text[e._parameters[0]];
+						debug("Save tool:   dir %d line %2d op 0x%02x [%s] %s", e._direction, e._line,
+							(int)e._opcode, params.c_str(), text.c_str());
+					}
+				}
+			}
+
 			if (giveKit) {
 				Common::Error err = _saves->saveGameState(slot, ConfMan.get("SaveToolDesc"), slot == 0);
 				debug("Save tool: slot %d written, result %d", slot, (int)err.getCode());
