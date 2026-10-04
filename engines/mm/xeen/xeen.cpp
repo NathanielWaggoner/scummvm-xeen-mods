@@ -397,8 +397,15 @@ void XeenEngine::play() {
 	if (ConfMan.hasKey("TestNotes") && ConfMan.getBool("TestNotes")) {
 		// Testing aid: check that map notes survive a save and reload, then leave the
 		// game running so the map screen can be tried, reporting the notes on exit
-		_party->_mapNotes.push_back(MapNote(_party->_mazeId, _map->_loadCcNum,
-			Common::Point(3, 4), "Saved note"));
+		static const int OFFSETS[4][2] = { { 1, 6 }, { 8, 9 }, { -7, 3 }, { 0, 11 } };
+		static const char *const TEXTS[4] = { "Saved note", "Right edge", "Left edge",
+			"A long note of thirty letters!" };
+		for (int idx = 0; idx < 4; ++idx) {
+			Common::Point pt = _party->_mazePosition + Common::Point(OFFSETS[idx][0], OFFSETS[idx][1]);
+			int mazeId = _map->mazeIdAt(pt);
+			if (mazeId)
+				_party->_mapNotes.push_back(MapNote(mazeId, _map->_loadCcNum, pt, TEXTS[idx]));
+		}
 		_saves->saveGameState(97, "Notes test");
 		_party->_mapNotes.clear();
 		_saves->loadGameState(97);

@@ -127,6 +127,12 @@ public:
 	 * @returns			Pointer within s to the portion that fits
 	 */
 	const char *fitToWidth(const char *s, int maxWidth);
+
+	/**
+	 * Returns the width in pixels of a plain string (one without any formatting
+	 * codes) in the normal or the reduced font
+	 */
+	int getStringWidth(const Common::String &s, bool reduced) const;
 	bool isSpace(char c);
 	/**
 	 * Write a charcter to the window

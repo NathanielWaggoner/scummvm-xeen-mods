@@ -34,6 +34,8 @@ namespace Xeen {
 #define MAP_YSTART 38
 #define TILE_WIDTH 10
 #define TILE_HEIGHT 8
+#define LABEL_PREFIX "\x03""l\x02\f""08"
+#define LABEL_SUFFIX "\fd\x01"
 
 void MapDialog::show(XeenEngine *vm) {
 	MapDialog *dlg = new MapDialog(vm);
@@ -193,18 +195,49 @@ void MapDialog::drawNotes() {
 	Map &map = *g_vm->_map;
 	Party &party = *g_vm->_party;
 	Screen &screen = *g_vm->_screen;
+	Window &w = (*g_vm->_windows)[5];
 
-	for (int row = 0; row < MAP_SIZE; ++row) {
-		for (int col = 0; col < MAP_SIZE; ++col) {
-			Common::Point tile(_pt.x - (MAP_DIFF - 1) + col, _pt.y + (MAP_DIFF - 1) - row);
-			int mazeId = map.mazeIdAt(tile);
-			if (!mazeId || party.findMapNote(mazeId, map._loadCcNum, tile) == -1)
-				continue;
+	// Labels are kept within the tile grid, clear of the window frame and title
+	const Common::Rect labelArea(MAP_XSTART, MAP_YSTART,
+		MAP_XSTART + MAP_SIZE * TILE_WIDTH, MAP_YSTART + MAP_SIZE * TILE_HEIGHT);
+	enum { MAX_LABEL_CHARS = 24, LABEL_HEIGHT = 8 };
 
-			// A small outlined square in the middle of the tile
-			const int xp = MAP_XSTART + col * TILE_WIDTH + 2, yp = MAP_YSTART + row * TILE_HEIGHT + 1;
-			screen.fillRect(Common::Rect(xp, yp, xp + 6, yp + 6), _noteOutlineColor);
-			screen.fillRect(Common::Rect(xp + 1, yp + 1, xp + 5, yp + 5), _noteColor);
+	// Markers first, then the labels, so that a label is never hidden by a marker
+	for (int pass = 0; pass < 2; ++pass) {
+		for (int row = 0; row < MAP_SIZE; ++row) {
+			for (int col = 0; col < MAP_SIZE; ++col) {
+				Common::Point tile(_pt.x - (MAP_DIFF - 1) + col, _pt.y + (MAP_DIFF - 1) - row);
+				int mazeId = map.mazeIdAt(tile);
+				int noteIdx = mazeId ? party.findMapNote(mazeId, map._loadCcNum, tile) : -1;
+				if (noteIdx == -1)
+					continue;
+
+				// The marker is a small outlined square in the middle of the tile
+				const int xp = MAP_XSTART + col * TILE_WIDTH + 2, yp = MAP_YSTART + row * TILE_HEIGHT + 1;
+				if (pass == 0) {
+					screen.fillRect(Common::Rect(xp, yp, xp + 6, yp + 6), _noteOutlineColor);
+					screen.fillRect(Common::Rect(xp + 1, yp + 1, xp + 5, yp + 5), _noteColor);
+					continue;
+				}
+
+				// The label sits just above the marker, centred on it where there's room
+				// and otherwise pushed back inside the window. Long notes are cut short
+				Common::String label = party._mapNotes[noteIdx]._text;
+				if (label.size() > MAX_LABEL_CHARS)
+					label = Common::String(label.c_str(), MAX_LABEL_CHARS - 2) + "..";
+
+				const int width = w.getStringWidth(label, true);
+				int labelX = CLIP<int>(xp + 3 - width / 2, labelArea.left + 1,
+					MAX<int>(labelArea.right - width - 2, labelArea.left + 1));
+				int labelY = yp - LABEL_HEIGHT - 1;
+				if (labelY < labelArea.top)
+					labelY = yp + 7;
+
+				screen.fillRect(Common::Rect(labelX - 1, labelY - 1, labelX + width + 1, labelY + LABEL_HEIGHT),
+					_noteOutlineColor);
+				w._writePos = Common::Point(labelX, labelY);
+				w.FontSurface::writeString(LABEL_PREFIX + label + LABEL_SUFFIX, labelArea, false);
+			}
 		}
 	}
 }

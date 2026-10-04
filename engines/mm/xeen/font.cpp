@@ -428,6 +428,19 @@ uint16_t FontSurface::getNextChar() {
 		return *_displayString++ & 0x7f;
 }
 
+int FontSurface::getStringWidth(const Common::String &s, bool reduced) const {
+	int total = 0;
+	for (uint idx = 0; idx < s.size(); ++idx) {
+		const byte c = (byte)s[idx];
+		if (c == ' ')
+			total += reduced ? 3 : 4;
+		else if (c > ' ' && c < 0x80)
+			total += _fontData[(reduced ? _fntEnReducedWOffset : _fntEnWOffset) + c];
+	}
+
+	return total;
+}
+
 bool FontSurface::getNextCharWidth(int &total) {
 	uint16_t c = getNextChar();
 
