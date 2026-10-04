@@ -128,6 +128,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 #endif
 
 	enum { REDRAW_NONE, REDRAW_TEXT, REDRAW_FULL } redrawFlag = REDRAW_FULL;
+	int page = 0;
 	for (;;) {
 		if (redrawFlag == REDRAW_FULL) {
 			// Write text for the dialog
@@ -170,13 +171,19 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 		if (redrawFlag == REDRAW_TEXT || redrawFlag == REDRAW_FULL) {
 			lines.clear();
 
-			for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
-				DrawStruct &ds = _itemsDrawList[idx];
+			// Shop stock only ever fills the first page
+			const int pageCount = (c == &_itemsCharacter) ? 1 : INV_PAGES;
+			if (page >= pageCount)
+				page = 0;
+
+			for (int row = 0; row < INV_PAGE_SIZE; ++row) {
+				const int idx = page * INV_PAGE_SIZE + row;
+				DrawStruct &ds = _itemsDrawList[row];
 				XeenItem &i = c->_items[category][idx];
 
 				ds._sprites = nullptr;
 				ds._x = 8;
-				ds._y = 18 + idx * 9;
+				ds._y = 18 + row * 9;
 
 				switch (category) {
 				case CATEGORY_WEAPON:
@@ -186,11 +193,11 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 						if ((mode == ITEMMODE_CHAR_INFO && !g_vm->_extOptions._showItemCosts)
 								|| mode == ITEMMODE_8 || mode == ITEMMODE_ENCHANT || mode == ITEMMODE_RECHARGE) {
 							lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE1,
-								arr[idx], idx + 1,
+								arr[idx], row + 1,
 								c->_items[category].getFullDescription(idx, arr[idx]).c_str()));
 						} else {
 							lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE2,
-								arr[idx], idx + 1,
+								arr[idx], row + 1,
 								c->_items[category].getFullDescription(idx, arr[idx]).c_str(),
 								calcItemCost(c, idx,
 									(mode == ITEMMODE_CHAR_INFO) ? ITEMMODE_BUY : mode,
@@ -204,7 +211,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 							ds._frame = i._frame;
 						else
 							ds._frame = 14;
-					} else if (ds._sprites == nullptr && idx == 0) {
+					} else if (ds._sprites == nullptr && row == 0) {
 						lines.push_back(Res.NO_ITEMS_AVAILABLE);
 					}
 					break;
@@ -212,7 +219,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 				case CATEGORY_MISC:
 					if (i._material == 0) {
 						// No item
-						if (idx == 0) {
+						if (row == 0) {
 							lines.push_back(Res.NO_ITEMS_AVAILABLE);
 						}
 					} else {
@@ -227,7 +234,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 						}
 
 						lines.push_back(Common::String::format(Res.ITEMS_DIALOG_LINE2,
-							arr[idx], idx + 1,
+							arr[idx], row + 1,
 							c->_items[category].getFullDescription(idx, arr[idx]).c_str(),
 							calcItemCost(c, idx, tempMode, skill, category)
 						));
@@ -244,7 +251,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			_buttonTexts.resize(lines.size() + buttonTextCount - 1);
 #endif
 
-			while (lines.size() < INV_ITEMS_TOTAL)
+			while (lines.size() < INV_PAGE_SIZE)
 				lines.push_back("");
 
 			Common::String ttsMessage;
@@ -326,8 +333,12 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			}
 #endif
 
+			if (pageCount > 1)
+				windows[30].writeString(Common::String::format(
+					"\x03""l\t282\v000\f15%d/%d\fd", page + 1, pageCount));
+
 			// Draw the glyphs for the items
-			windows[0].drawList(_itemsDrawList, INV_ITEMS_TOTAL);
+			windows[0].drawList(_itemsDrawList, INV_PAGE_SIZE);
 			windows[0].update();
 		}
 
@@ -464,6 +475,7 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 			// Select an item
 			if (mode != ITEMMODE_3) {
 				_buttonValue -= Common::KEYCODE_1;
+				_buttonValue += page * INV_PAGE_SIZE;
 				if (_buttonValue != itemIndex) {
 					// Check whether the new selection has an associated item
 					if (!c->_items[category][_buttonValue].empty()) {
@@ -478,6 +490,15 @@ Character *ItemsDialog::execute(Character *c, ItemsMode mode) {
 
 				redrawFlag = REDRAW_TEXT;
 			}
+
+		} else if (Common::KEYCODE_PAGEDOWN == _buttonValue || Common::KEYCODE_PAGEUP == _buttonValue
+				|| Common::KEYCODE_PERIOD == _buttonValue || Common::KEYCODE_COMMA == _buttonValue) {
+			// Next/previous page of the backpack
+			bool isNext = Common::KEYCODE_PAGEDOWN == _buttonValue || Common::KEYCODE_PERIOD == _buttonValue;
+			page = (page + (isNext ? 1 : INV_PAGES - 1)) % INV_PAGES;
+			Common::fill(&arr[0], &arr[40], 0);
+			itemIndex = -1;
+			redrawFlag = REDRAW_FULL;
 
 		} else if (Res.KeyConstants.DialogsItems.KEY_WEAPONS == _buttonValue) {
 			// Weapons category

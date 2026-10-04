@@ -323,6 +323,25 @@ void XeenEngine::play() {
 
 	_combat->_moveMonsters = true;
 
+	if (ConfMan.hasKey("TestBackpack") && ConfMan.getBool("TestBackpack")) {
+		// Testing aid: overfill a backpack and check that it survives a save and reload
+		Character &c = _party->_activeParty[0];
+		if (c._weapons[0].empty())
+			c._weapons[0]._id = 1;
+		for (int idx = 1; idx < 20; ++idx)
+			c._weapons[idx] = c._weapons[0];
+
+		_saves->saveGameState(98, "Backpack test");
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			c._weapons[idx].clear();
+		_saves->loadGameState(98);
+
+		int count = 0;
+		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
+		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
 	gameLoop();
 
 	if (_party->_dead)

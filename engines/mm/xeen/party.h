@@ -66,6 +66,12 @@ public:
 	Roster();
 
 	void synchronize(Common::Serializer &s);
+
+	/**
+	 * Saves or loads the backpack slots beyond the original nine per category.
+	 * When loading, hasData is false for saves that predate the larger backpack
+	 */
+	void synchronizeExtraItems(Common::Serializer &s, bool hasData);
 };
 
 class Treasure {
@@ -101,7 +107,7 @@ public:
 /**
  * Each side of Xeen supports 4 blacksmith inventories of up to 9 items each
  */
-typedef XeenItem BlacksmithItems[2][4][INV_ITEMS_TOTAL];
+typedef XeenItem BlacksmithItems[2][4][SHOP_ITEMS_TOTAL];
 
 class BlacksmithWares {
 private:

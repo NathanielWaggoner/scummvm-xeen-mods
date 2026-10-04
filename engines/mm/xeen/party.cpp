@@ -66,6 +66,41 @@ void Roster::synchronize(Common::Serializer &s) {
 		(*this)[i].synchronize(s);
 }
 
+void Roster::synchronizeExtraItems(Common::Serializer &s, bool hasData) {
+	// The extra slots follow the original character records, tagged so that
+	// their absence in an older save can be recognised
+	uint32 tag = MKTAG('X', 'I', 'N', 'V');
+	byte itemsTotal = INV_ITEMS_TOTAL;
+
+	if (s.isSaving() || hasData) {
+		s.syncAsUint32BE(tag);
+		s.syncAsByte(itemsTotal);
+		if (tag != MKTAG('X', 'I', 'N', 'V'))
+			hasData = false;
+	}
+
+	for (uint charIdx = 0; charIdx < TOTAL_CHARACTERS; ++charIdx) {
+		Character &c = (*this)[charIdx];
+
+		for (int cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; ++cat) {
+			InventoryItems &items = c._items[(ItemCategory)cat];
+
+			if (s.isLoading()) {
+				for (int idx = INV_PAGE_SIZE; idx < INV_ITEMS_TOTAL; ++idx)
+					items[idx].clear();
+				if (!hasData)
+					continue;
+			}
+
+			// A save written with a different backpack size is still read in full,
+			// with anything beyond the current size being dropped
+			XeenItem dummy;
+			for (int idx = INV_PAGE_SIZE; idx < itemsTotal; ++idx)
+				((idx < INV_ITEMS_TOTAL) ? items[idx] : dummy).synchronize(s);
+		}
+	}
+}
+
 /*------------------------------------------------------------------------*/
 
 Treasure::Treasure() {
@@ -107,7 +142,7 @@ void BlacksmithWares::clear() {
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
 		for (int ccNum = 0; ccNum < 2; ++ccNum)
 			for (int slot = 0; slot < 4; ++slot)
-					for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+					for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 						(*this)[cat][ccNum][slot][idx].clear();
 }
 
@@ -158,7 +193,7 @@ void BlacksmithWares::blackData2CharData(Character &c) {
 	int slotIndex = getSlotIndex();
 
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
-		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+		for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 			c._items[cat][idx] = (*this)[cat][ccNum][slotIndex][idx];
 }
 
@@ -167,7 +202,7 @@ void BlacksmithWares::charData2BlackData(Character &c) {
 	int slotIndex = getSlotIndex();
 
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
-		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+		for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 			(*this)[cat][ccNum][slotIndex][idx] = c._items[cat][idx];
 }
 
@@ -195,7 +230,7 @@ uint BlacksmithWares::getSlotIndex() const {
 
 void BlacksmithWares::synchronize(Common::Serializer &s, int ccNum) {
 	for (ItemCategory cat = CATEGORY_WEAPON; cat <= CATEGORY_MISC; cat = (ItemCategory)((int)cat + 1))
-		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
+		for (int idx = 0; idx < SHOP_ITEMS_TOTAL; ++idx)
 			for (int slot = 0; slot < 4; ++slot)
 				(*this)[cat][ccNum][slot][idx].synchronize(s);
 }
@@ -968,7 +1003,7 @@ bool Party::giveTake(int takeMode, uint takeVal, int giveMode, uint giveVal, int
 			_questItems[takeVal - MISC_END]--;
 		} else {
 			bool found = false;
-			for (int idx = 0; idx < 9; ++idx) {
+			for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
 				if (takeVal < WEAPONS_END) {
 					if (ps._weapons[idx]._id == takeVal) {
 						ps._weapons[idx].clear();
