@@ -165,16 +165,6 @@ Character &Character::operator=(const Character &src) {
 	return *this;
 }
 
-bool Character::hasNoItems() const {
-	for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx) {
-		if (!_weapons[idx].empty() || !_armor[idx].empty()
-				|| !_accessories[idx].empty() || !_misc[idx].empty())
-			return false;
-	}
-
-	return true;
-}
-
 void Character::giveStarterKit() {
 	// Candidates for each piece of kit, best first. The first one the character's
 	// class is allowed to use is given, and nothing if there's none
@@ -190,23 +180,28 @@ void Character::giveStarterKit() {
 	static const int *const WEAPON_SETS[] = { MELEE, MISSILE };
 	static const int *const ARMOR_SETS[] = { BODY, SHIELD, HELM, BOOTS, GAUNTLETS };
 
-	int slot = 0;
+	// Items go into free backpack slots, so anything already carried is kept
 	for (uint setIdx = 0; setIdx < ARRAYSIZE(WEAPON_SETS); ++setIdx) {
 		for (const int *id = WEAPON_SETS[setIdx]; *id; ++id) {
 			if (_weapons.passRestrictions(*id, true)) {
-				_weapons[slot].clear();
-				_weapons[slot++]._id = *id;
+				if (!_weapons.isFull()) {
+					_weapons[INV_ITEMS_TOTAL - 1].clear();
+					_weapons[INV_ITEMS_TOTAL - 1]._id = *id;
+					_weapons.sort();
+				}
 				break;
 			}
 		}
 	}
 
-	slot = 0;
 	for (uint setIdx = 0; setIdx < ARRAYSIZE(ARMOR_SETS); ++setIdx) {
 		for (const int *id = ARMOR_SETS[setIdx]; *id; ++id) {
 			if (_armor.passRestrictions(*id, true)) {
-				_armor[slot].clear();
-				_armor[slot++]._id = *id;
+				if (!_armor.isFull()) {
+					_armor[INV_ITEMS_TOTAL - 1].clear();
+					_armor[INV_ITEMS_TOTAL - 1]._id = *id;
+					_armor.sort();
+				}
 				break;
 			}
 		}

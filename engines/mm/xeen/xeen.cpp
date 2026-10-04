@@ -303,9 +303,41 @@ void XeenEngine::play() {
 
 	_map->clearMaze();
 	if (_loadSaveSlot >= 0) {
+		const int slot = _loadSaveSlot;
 		_saves->newGame();
 		_saves->loadGameState(_loadSaveSlot);
 		_loadSaveSlot = -1;
+
+		if (ConfMan.hasKey("SaveToolMode")) {
+			// Maintenance aid, run from the command line against one save slot: reports
+			// what the party is carrying and, in "givekit" mode, gives a starter kit to
+			// every member without a weapon and writes the save back
+			const bool giveKit = ConfMan.get("SaveToolMode") == "givekit";
+			for (uint idx = 0; idx < _party->_activeParty.size(); ++idx) {
+				Character &c = _party->_activeParty[idx];
+				int counts[4];
+				for (int cat = 0; cat < 4; ++cat) {
+					counts[cat] = 0;
+					for (int i = 0; i < INV_ITEMS_TOTAL; ++i)
+						counts[cat] += c._items[(ItemCategory)cat][i].empty() ? 0 : 1;
+				}
+
+				const bool given = giveKit && !counts[CATEGORY_WEAPON];
+				if (given)
+					c.giveStarterKit();
+				debug("Save tool: %s (%s, level %d, exp %u): %d weapons, %d armor, %d accessories, %d misc%s",
+					c._name.c_str(), Res.CLASS_NAMES[c._class], c._level._permanent, c._experience,
+					counts[0], counts[1], counts[2], counts[3], given ? " -> kit given" : "");
+			}
+
+			if (giveKit) {
+				Common::Error err = _saves->saveGameState(slot, ConfMan.get("SaveToolDesc"), slot == 0);
+				debug("Save tool: slot %d written, result %d", slot, (int)err.getCode());
+			}
+
+			quitGame();
+			return;
+		}
 	} else {
 		_map->load(_party->_mazeId);
 	}

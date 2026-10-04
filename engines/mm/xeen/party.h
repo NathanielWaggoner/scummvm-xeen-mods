@@ -263,12 +263,6 @@ public:
 
 	void loadActiveParty();
 
-	/**
-	 * Gives a starter kit to any character who has no experience and no items. This
-	 * covers characters created before starter kits were turned on
-	 */
-	void giveStarterKits();
-
 	bool checkSkill(Skill skillId);
 
 	bool isInParty(int charId);

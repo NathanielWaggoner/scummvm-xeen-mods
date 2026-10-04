@@ -196,11 +196,6 @@ public:
 	void clear();
 
 	/**
-	 * Returns true if the character is carrying nothing at all
-	 */
-	bool hasNoItems() const;
-
-	/**
 	 * Puts a basic weapon, a missile weapon and whatever armor the character's class
 	 * can use into their backpack
 	 */
