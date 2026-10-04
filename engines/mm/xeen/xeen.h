@@ -125,6 +125,8 @@ class XeenEngine : public MMEngine {
 		bool _mapNotes;			// Notes can be attached to tiles on the map screen
 		bool _mapZoom;			// The map screen can be zoomed and dragged about
 		bool _autoPlay;			// P lets the game explore and fight by itself
+		bool _safeCauldrons;	// Searching vats and cauldrons never does damage
+		bool _searchPreview;	// Prompts to search something say what the search will do
 		bool _maxStartStats;	// New characters get the best possible attribute rolls
 		bool _starterKit;		// New characters get basic equipment for their class
 
@@ -145,6 +147,8 @@ class XeenEngine : public MMEngine {
 			_mapNotes(false),
 			_mapZoom(false),
 			_autoPlay(false),
+			_safeCauldrons(false),
+			_searchPreview(false),
 			_maxStartStats(false),
 			_starterKit(false)
 		{}

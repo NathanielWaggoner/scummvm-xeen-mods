@@ -41,6 +41,8 @@ Name: "tabswitch"; Description: "Tab switches character in dialogs"; Types: full
 Name: "mapnotes"; Description: "Map notes (click the map to add notes)"; Types: full convenience
 Name: "mapzoom"; Description: "Map zoom and drag"; Types: full convenience
 Name: "autoplay"; Description: "Auto-play (P makes the party explore and fight by itself)"; Types: full
+Name: "safecauldrons"; Description: "Safe cauldrons (searching vats and cauldrons does no damage)"; Types: full
+Name: "searchpreview"; Description: "Search preview (prompts say what searching will do)"; Types: full
 Name: "maxstats"; Description: "Maximum starting stats for new characters"; Types: full
 Name: "starterkit"; Description: "Starter kit for new characters"; Types: full
 
@@ -207,6 +209,8 @@ begin
   SetMod('MapNotes', 'mapnotes', Ini);
   SetMod('MapZoom', 'mapzoom', Ini);
   SetMod('AutoPlay', 'autoplay', Ini);
+  SetMod('SafeCauldrons', 'safecauldrons', Ini);
+  SetMod('SearchPreview', 'searchpreview', Ini);
   SetMod('MaxStartStats', 'maxstats', Ini);
   SetMod('StarterKit', 'starterkit', Ini);
 

@@ -66,6 +66,16 @@ Auto-play (AutoPlay)
     attacks. It switches itself off when the party is down to about a third
     of its hit points.
 
+Safe cauldrons (SafeCauldrons)
+    Searching a vat or cauldron no longer damages the character who searches.
+    Whatever else it gives (stat bonuses, items) is unchanged.
+
+Search preview (SearchPreview)
+    When the game asks who will search or open something, a line over the
+    view lists what it can give or do: stat bonuses, experience, gold, gems,
+    items, damage. Where a script has more than one outcome, all of them are
+    listed.
+
 Maximum starting stats (MaxStartStats)
     New characters roll 21 in every attribute.
 

@@ -200,7 +200,9 @@ void XeenEngine::loadSettings() {
 		{ "TabSwitchesCharacter", &_extOptions._tabSwitchesChar },
 		{ "MapNotes", &_extOptions._mapNotes },
 		{ "MapZoom", &_extOptions._mapZoom },
-		{ "AutoPlay", &_extOptions._autoPlay }
+		{ "AutoPlay", &_extOptions._autoPlay },
+		{ "SafeCauldrons", &_extOptions._safeCauldrons },
+		{ "SearchPreview", &_extOptions._searchPreview }
 	};
 	for (uint idx = 0; idx < ARRAYSIZE(MODS); ++idx)
 		*MODS[idx]._option = ConfMan.hasKey(MODS[idx]._key) ? ConfMan.getBool(MODS[idx]._key) : legacy;
@@ -461,6 +463,11 @@ void XeenEngine::play() {
 		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
 			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
 		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
+	if (ConfMan.hasKey("TestTeleportX") && ConfMan.hasKey("TestTeleportY")) {
+		// Testing aid: start from a given tile of the loaded map
+		_party->_mazePosition = Common::Point(ConfMan.getInt("TestTeleportX"), ConfMan.getInt("TestTeleportY"));
 	}
 
 	if (ConfMan.hasKey("TestAutoSpells") && ConfMan.getBool("TestAutoSpells")) {

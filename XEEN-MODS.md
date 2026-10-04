@@ -19,6 +19,8 @@ configuration file, and is off unless set.
 | `AutoPlay` | The party explores and fights by itself: shoots monsters in sight, casts ready attack spells, otherwise attacks. Stops when the party is badly hurt. | P toggles |
 | `LargeBackpack` | 36 backpack slots per item category instead of 9. | PgUp/PgDn or , . change page |
 | `ItemStats` | Weapon damage and armor class shown beside item names without Identify. | |
+| `SafeCauldrons` | Searching a vat or cauldron does no damage; whatever else it gives is unchanged. | |
+| `SearchPreview` | "Who will search" prompts list what the search can give or do: stat bonuses, experience, gold, gems, items, damage. | |
 | `MaxStartStats` | New characters roll 21 in every attribute. | |
 | `StarterKit` | New characters get a basic weapon and armor for their class. | |
 | `BulkTraining` | Training carries on through every level the character qualifies for and can afford. | |
