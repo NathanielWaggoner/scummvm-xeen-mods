@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/config-manager.h"
 #include "mm/xeen/interface.h"
 #include "mm/xeen/dialogs/dialogs_char_info.h"
 #include "mm/xeen/dialogs/dialogs_control_panel.h"
@@ -48,6 +49,11 @@ static const uint8 kCombatButtonCount = 3;
 
 enum {
 	SCENE_WINDOW = 11, SCENE_WIDTH = 216, SCENE_HEIGHT = 132
+};
+
+// Pseudo button value used in real-time mode when a character's combat turn times out
+enum {
+	RT_SKIP_TURN = -1
 };
 
 enum CombatButtonTTSTextIndex {
@@ -271,6 +277,7 @@ Interface::Interface(XeenEngine *vm) : ButtonContainer(vm), InterfaceScene(vm),
 	_face1State = _face2State = 2;
 	_upDoorText = false;
 	_tillMove = 0;
+	_rtNextTick = 0;
 	_iconsMode = ICONS_STANDARD;
 	Common::fill(&_charFX[0], &_charFX[MAX_ACTIVE_PARTY], 0);
 	setWaitBounds();
@@ -389,7 +396,15 @@ void Interface::perform() {
 
 			checkEvents(g_vm);
 		} while (!_buttonValue && events.timeElapsed() < 1);
+
+		// Real-time mode: monsters keep moving while the party stands idle
+		if (!_buttonValue && _vm->_mode == MODE_INTERACTIVE && _falling == FALL_NONE
+				&& combat._moveMonsters && realTimeElapsed(g_vm->_extOptions._rtExploreMs)) {
+			resetRealTimeTimer();
+			combat.moveMonsters();
+		}
 	} while (!_buttonValue);
+	resetRealTimeTimer();
 
 	if (_buttonValue == Common::KEYCODE_SPACE) {
 		int lookupId = map.mazeLookup(party._mazePosition,
@@ -432,6 +447,10 @@ void Interface::perform() {
 	}
 
 	switch (_buttonValue) {
+	case Common::KEYCODE_RETURN:
+		toggleRealTime();
+		break;
+
 	case Common::KEYCODE_TAB:
 		// Show control panel
 		combat._moveMonsters = false;
@@ -707,6 +726,27 @@ void Interface::perform() {
 	default:
 		break;
 	}
+}
+
+void Interface::toggleRealTime() {
+	g_vm->_extOptions._realTime = !g_vm->_extOptions._realTime;
+	ConfMan.setBool("RealTime", g_vm->_extOptions._realTime);
+	ConfMan.flushToDisk();
+	resetRealTimeTimer();
+	_vm->_sound->playFX(g_vm->_extOptions._realTime ? 20 : 21);
+}
+
+bool Interface::realTimeElapsed(uint intervalMs) {
+	if (!g_vm->_extOptions._realTime)
+		return false;
+
+	uint32 now = g_system->getMillis();
+	if (!_rtNextTick) {
+		_rtNextTick = now + intervalMs;
+		return false;
+	}
+
+	return now >= _rtNextTick;
 }
 
 void Interface::chargeStep() {
@@ -1375,6 +1415,9 @@ void Interface::draw3d(bool updateFlag, bool pauseFlag) {
 		_ttsPreviousScreenText.clear();
 	}
 
+	if (g_vm->_extOptions._realTime && (_vm->_mode == MODE_INTERACTIVE || _vm->_mode == MODE_COMBAT))
+		windows[3].writeString("""08""l	012010REAL TIMEd", false);
+
 	if (updateFlag) {
 		windows[1].update();
 		windows[3].update();
@@ -1599,6 +1642,7 @@ void Interface::doCombat() {
 	bool upDoorText = _upDoorText;
 	bool reloadMap = false;
 	int index = 0;
+	int rtWhosTurn = -2;
 
 	_upDoorText = false;
 	combat._combatMode = COMBATMODE_2;
@@ -1676,6 +1720,10 @@ void Interface::doCombat() {
 
 			// Wait for keypress
 			index = 0;
+			if (combat._whosTurn != rtWhosTurn) {
+				rtWhosTurn = combat._whosTurn;
+				resetRealTimeTimer();
+			}
 			do {
 				events.updateGameCounter();
 				draw3d(true);
@@ -1690,11 +1738,30 @@ void Interface::doCombat() {
 					events.pollEventsAndWait();
 					checkEvents(_vm);
 				} while (!_vm->shouldExit() && events.timeElapsed() < 1 && !_buttonValue);
+
+				// Real-time mode: a character who takes too long loses their go
+				if (!_buttonValue && realTimeElapsed(g_vm->_extOptions._rtCombatMs))
+					_buttonValue = RT_SKIP_TURN;
 			} while (!_vm->shouldExit() && !_buttonValue);
 			if (_vm->shouldExit())
 				goto exit;
 
+			// Choosing a target or turning doesn't buy the character more time,
+			// but anything that opens a dialog restarts their clock
+			if (_buttonValue != Common::KEYCODE_1 && _buttonValue != Common::KEYCODE_2
+					&& _buttonValue != Common::KEYCODE_3 && _buttonValue != Common::KEYCODE_LEFT
+					&& _buttonValue != Common::KEYCODE_RIGHT)
+				resetRealTimeTimer();
+
 			switch (_buttonValue) {
+			case RT_SKIP_TURN:
+				nextChar();
+				break;
+
+			case Common::KEYCODE_RETURN:
+				toggleRealTime();
+				break;
+
 			case Common::KEYCODE_TAB:
 				// Show the control panel
 				if (ControlPanel::show(_vm) == 2) {

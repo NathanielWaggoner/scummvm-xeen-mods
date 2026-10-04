@@ -113,8 +113,22 @@ private:
 	int _holyBonusUIFrame;
 	int _heroismUIFrame;
 	int _flipUIFrame;
+	uint32 _rtNextTick;
 
 	void loadSprites();
+
+	/**
+	 * Toggles between real-time and turn-based play
+	 */
+	void toggleRealTime();
+
+	/**
+	 * Returns true once the given real-time interval has run out. The timer
+	 * starts on the first call after resetRealTimeTimer
+	 */
+	bool realTimeElapsed(uint intervalMs);
+
+	void resetRealTimeTimer() { _rtNextTick = 0; }
 
 	void setupBackground();
 

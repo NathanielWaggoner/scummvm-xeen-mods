@@ -179,6 +179,11 @@ void XeenEngine::loadSettings() {
 	_extOptions._showItemCosts = ConfMan.hasKey("ShowItemCosts") && ConfMan.getBool("ShowItemCosts");
 	_extOptions._durableArmor = ConfMan.hasKey("DurableArmor") && ConfMan.getBool("DurableArmor");
 	_extOptions._showHpSpBars = ConfMan.hasKey("ShowHpSpBars") && ConfMan.getBool("ShowHpSpBars");
+	_extOptions._realTime = ConfMan.hasKey("RealTime") && ConfMan.getBool("RealTime");
+	if (ConfMan.hasKey("RealTimeExploreMs"))
+		_extOptions._rtExploreMs = MAX(ConfMan.getInt("RealTimeExploreMs"), 250);
+	if (ConfMan.hasKey("RealTimeCombatMs"))
+		_extOptions._rtCombatMs = MAX(ConfMan.getInt("RealTimeCombatMs"), 250);
 
 	// If requested, load a savegame instead of showing the intro
 	if (ConfMan.hasKey("save_slot")) {
@@ -199,6 +204,12 @@ void XeenEngine::outerGameLoop() {
 	if (_loadSaveSlot != -1)
 		// Loading savegame from launcher, so Skip menu and go straight to game
 		_gameMode = GMODE_PLAY_GAME;
+
+	if (_loadSaveSlot == -1 && ConfMan.hasKey("QuickStart") && ConfMan.getBool("QuickStart")) {
+		// Testing aid: skip the intro and menus and drop straight into a new game
+		_saves->newGame();
+		_gameMode = GMODE_PLAY_GAME;
+	}
 
 	while (!shouldQuit() && _gameMode != GMODE_QUIT) {
 		GameMode mode = _gameMode;

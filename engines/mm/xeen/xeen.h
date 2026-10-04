@@ -112,11 +112,17 @@ class XeenEngine : public MMEngine {
 		bool _showItemCosts;
 		bool _durableArmor;
 		bool _showHpSpBars;
+		bool _realTime;			// Monsters act on a timer rather than only when the party acts
+		uint _rtExploreMs;		// Real-time: delay between monster moves while exploring
+		uint _rtCombatMs;		// Real-time: how long a character can dither in combat
 
 		ExtendedOptions() :
 			_showItemCosts(false),
 			_durableArmor(false),
-			_showHpSpBars(false)
+			_showHpSpBars(false),
+			_realTime(false),
+			_rtExploreMs(2000),
+			_rtCombatMs(3000)
 		{}
 	};
 private:
