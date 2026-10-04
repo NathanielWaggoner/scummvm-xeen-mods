@@ -91,7 +91,7 @@ Licence and source code
 ScummVM is free software under the GNU General Public License, version 3 or
 later; see COPYING.txt. This build is ScummVM's development code with the
 mods above added to the Might and Magic engine. The modified source code is
-available from whoever gave you this installer, as the licence requires.
+at https://github.com/NathanielWaggoner/scummvm-xeen-mods (branch xeen-mod).
 
 Might and Magic and World of Xeen are trademarks of their respective owners.
 This project is not affiliated with them or with the ScummVM team.
