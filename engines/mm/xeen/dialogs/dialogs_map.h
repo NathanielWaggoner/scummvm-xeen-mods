@@ -22,6 +22,7 @@
 #ifndef XEEN_DIALOGS_MAP_H
 #define XEEN_DIALOGS_MAP_H
 
+#include "graphics/managed_surface.h"
 #include "mm/xeen/dialogs/dialogs.h"
 
 namespace MM {
@@ -36,9 +37,53 @@ private:
 	Common::Point _pt, _arrowPt;
 	bool _frameEndFlag;
 	byte _noteColor, _noteOutlineColor;
+
+	// The part of the map on show: the west-most and north-most tile, and how many
+	// lots of the standard 16 tiles are fitted in each way
+	Common::Point _view;
+	int _zoom;
+	Graphics::ManagedSurface _mapBuffer;
 private:
 	MapDialog(XeenEngine *vm) : ButtonContainer(vm),
-		_animFrame(0), _frameEndFlag(false) {}
+		_animFrame(0), _frameEndFlag(false), _noteColor(0), _noteOutlineColor(0), _zoom(1) {}
+
+	/**
+	 * Returns how many tiles are shown across and down the map
+	 */
+	int viewTiles() const;
+
+	/**
+	 * Keeps the view within the area the map can show, which is the current
+	 * maze and the ones immediately around it
+	 */
+	void clampView();
+
+	/**
+	 * Changes how far out the map is zoomed, keeping the middle of the view put
+	 */
+	void setZoom(int zoom);
+
+	/**
+	 * Moves the view by a number of tiles east and north
+	 */
+	void panView(int dx, int dy);
+
+	/**
+	 * Draws the tiles for the current view. Zoomed out, this draws the standard
+	 * view several times over and shrinks the result to fit
+	 */
+	void drawView();
+
+	/**
+	 * Draws the whole dialog
+	 */
+	void render(bool &ttsVoiceText);
+
+	/**
+	 * Handles a left mouse press on the map: dragging moves the view, while a
+	 * plain click adds or edits a note. Returns true if a note prompt was shown
+	 */
+	bool dragOrClick();
 
 	/**
 	 * Draws the map contents when outdoors
