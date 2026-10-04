@@ -496,7 +496,7 @@ void XeenEngine::play() {
 	if (ConfMan.hasKey("TestNotes") && ConfMan.getBool("TestNotes")) {
 		// Testing aid: check that map notes survive a save and reload, then leave the
 		// game running so the map screen can be tried, reporting the notes on exit
-		static const int OFFSETS[4][2] = { { 1, 6 }, { 8, 9 }, { -7, 3 }, { 0, 11 } };
+		static const int OFFSETS[4][2] = { { 1, 2 }, { 8, 9 }, { -3, -3 }, { 0, 11 } };
 		static const char *const TEXTS[4] = { "Saved note", "Right edge", "Left edge",
 			"A long note of thirty letters!" };
 		for (int idx = 0; idx < 4; ++idx) {

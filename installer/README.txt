@@ -50,7 +50,8 @@ Tab switches character (TabSwitchesCharacter)
 Map notes (MapNotes)
     On the map screen (M), left-click a tile to attach a note, left-click a
     marker to edit it, right-click a marker to delete it. Hover over a marker
-    to read it; V shows or hides the text of every note.
+    to read it; V shows or hides the text of every note. Notes also show as
+    markers on the minimap.
 
 Map zoom and drag (MapZoom)
     On the map screen, the mouse wheel (or - and =) zooms between three
