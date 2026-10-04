@@ -199,7 +199,8 @@ void XeenEngine::loadSettings() {
 		{ "SpaceConfirms", &_extOptions._spaceConfirms },
 		{ "TabSwitchesCharacter", &_extOptions._tabSwitchesChar },
 		{ "MapNotes", &_extOptions._mapNotes },
-		{ "MapZoom", &_extOptions._mapZoom }
+		{ "MapZoom", &_extOptions._mapZoom },
+		{ "AutoPlay", &_extOptions._autoPlay }
 	};
 	for (uint idx = 0; idx < ARRAYSIZE(MODS); ++idx)
 		*MODS[idx]._option = ConfMan.hasKey(MODS[idx]._key) ? ConfMan.getBool(MODS[idx]._key) : legacy;
@@ -401,6 +402,29 @@ void XeenEngine::play() {
 		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
 			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
 		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
+	if (ConfMan.hasKey("TestAutoSpells") && ConfMan.getBool("TestAutoSpells")) {
+		// Testing aid: ready an attack spell, with points to cast it, for every
+		// character whose class has one
+		for (uint idx = 0; idx < _party->_activeParty.size(); ++idx) {
+			Character &c = _party->_activeParty[idx];
+			int category = c.getSpellsCategory();
+			if (category < 0 || category > 2)
+				continue;
+
+			for (int spellIdx = 0; spellIdx < SPELLS_PER_CLASS; ++spellIdx) {
+				if (Spells::isAttackSpell((MagicSpell)Res.SPELLS_ALLOWED[category][spellIdx])) {
+					c._spells[spellIdx] = true;
+					c._hasSpells = true;
+					c._currentSpell = spellIdx;
+					c._currentSp = 200;
+					debug("Auto spells test: %s readies spell %d", c._name.c_str(),
+						(int)Res.SPELLS_ALLOWED[category][spellIdx]);
+					break;
+				}
+			}
+		}
 	}
 
 	if (ConfMan.hasKey("TestNotes") && ConfMan.getBool("TestNotes")) {

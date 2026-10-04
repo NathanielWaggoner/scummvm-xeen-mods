@@ -53,7 +53,12 @@ enum {
 
 // Pseudo button value used in real-time mode when a character's combat turn times out
 enum {
-	RT_SKIP_TURN = -1
+	RT_SKIP_TURN = -1, AUTO_PLAY_ACT = -2
+};
+
+enum {
+	AUTO_PLAY_STEP_MS = 220, AUTO_PLAY_FIGHT_MS = 350, AUTO_PLAY_MAX_SHOTS = 6,
+	AUTO_PLAY_MIN_HEALTH = 35
 };
 
 enum CombatButtonTTSTextIndex {
@@ -288,6 +293,10 @@ Interface::Interface(XeenEngine *vm) : ButtonContainer(vm), InterfaceScene(vm),
 	_upDoorText = false;
 	_tillMove = 0;
 	_rtNextTick = 0;
+	_autoPlaying = false;
+	_autoProbing = false;
+	_autoNextTime = 0;
+	_autoShots = 0;
 	_iconsMode = ICONS_STANDARD;
 	Common::fill(&_charFX[0], &_charFX[MAX_ACTIVE_PARTY], 0);
 	setWaitBounds();
@@ -407,6 +416,10 @@ void Interface::perform() {
 			checkEvents(g_vm);
 		} while (!_buttonValue && events.timeElapsed() < 1);
 
+		// Auto-play: explore when the player hasn't pressed anything
+		if (!_buttonValue && _autoPlaying)
+			autoPlayExplore();
+
 		// Real-time mode: monsters keep moving while the party stands idle
 		if (!_buttonValue && _vm->_mode == MODE_INTERACTIVE && _falling == FALL_NONE
 				&& combat._moveMonsters && realTimeElapsed(g_vm->_extOptions._rtExploreMs)) {
@@ -459,6 +472,10 @@ void Interface::perform() {
 	switch (_buttonValue) {
 	case Common::KEYCODE_RETURN:
 		toggleRealTime();
+		break;
+
+	case Common::KEYCODE_p:
+		toggleAutoPlay();
 		break;
 
 	case Common::KEYCODE_TAB:
@@ -757,6 +774,171 @@ bool Interface::realTimeElapsed(uint intervalMs) {
 	}
 
 	return now >= _rtNextTick;
+}
+
+void Interface::toggleAutoPlay() {
+	if (!g_vm->_extOptions._autoPlay)
+		return;
+
+	_autoPlaying = !_autoPlaying;
+	_autoVisits.clear();
+	_autoShots = 0;
+	_autoLastTile = Common::Point(-999, -999);
+	_autoNextTime = g_system->getMillis() + AUTO_PLAY_STEP_MS;
+	_vm->_sound->playFX(_autoPlaying ? 20 : 21);
+}
+
+bool Interface::autoPlayPartyOk() const {
+	Party &party = *_vm->_party;
+	int current = 0, maximum = 0;
+
+	for (uint idx = 0; idx < party._activeParty.size(); ++idx) {
+		const Character &c = party._activeParty[idx];
+		current += MAX(c._currentHp, 0);
+		maximum += c.getMaxHP();
+	}
+
+	return maximum > 0 && current * 100 >= maximum * AUTO_PLAY_MIN_HEALTH;
+}
+
+bool Interface::autoPlayCanStep(Direction dir) {
+	static const int DELTA_X[4] = { 0, 1, 0, -1 }, DELTA_Y[4] = { 1, 0, -1, 0 };
+	Map &map = *_vm->_map;
+	Party &party = *_vm->_party;
+
+	// The game's own movement check works from the direction the party is facing
+	const Direction facing = party._mazeDirection;
+	party._mazeDirection = dir;
+	_autoProbing = true;
+	bool canMove = checkMoveDirection(Common::KEYCODE_UP);
+	_autoProbing = false;
+	party._mazeDirection = facing;
+
+	if (canMove) {
+		const Common::Point dest(party._mazePosition.x + DELTA_X[dir], party._mazePosition.y + DELTA_Y[dir]);
+
+		// Tiles with something on them are left alone: shops, stairs, traps, signs
+		// and the like would all need the player
+		map.cellFlagLookup(dest);
+		if (map._currentIsEvent)
+			canMove = false;
+
+		// As is ground that hurts, or that needs a skill or spell to cross
+		if (canMove && map.mazeLookup(dest, 0, 0xffff) != INVALID_CELL) {
+			switch (map.mazeData()._surfaceTypes[map._currentSurfaceId]) {
+			case SURFTYPE_LAVA:
+			case SURFTYPE_DESERT:
+			case SURFTYPE_DWATER:
+			case SURFTYPE_SKY:
+			case SURFTYPE_CLOUD:
+			case SURFTYPE_SPACE:
+			case SURFTYPE_SWAMP:
+				canMove = false;
+				break;
+			case SURFTYPE_WATER:
+				if (map._isOutdoors)
+					canMove = false;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	// Put the map's notion of the current tile back as it was
+	map.cellFlagLookup(party._mazePosition);
+	return canMove;
+}
+
+void Interface::autoPlayExplore() {
+	Combat &combat = *_vm->_combat;
+	Party &party = *_vm->_party;
+	uint32 now = g_system->getMillis();
+
+	if (_vm->_mode != MODE_INTERACTIVE || _falling != FALL_NONE || now < _autoNextTime)
+		return;
+	_autoNextTime = now + AUTO_PLAY_STEP_MS;
+
+	if (!autoPlayPartyOk()) {
+		// Too badly hurt to carry on unsupervised
+		toggleAutoPlay();
+		return;
+	}
+
+	// Monsters in sight but not yet in reach are shot at, for a while at least: if
+	// they never come any closer, carry on exploring
+	const bool monstersClose = combat._attackMonsters[0] != -1 || combat._attackMonsters[1] != -1
+		|| combat._attackMonsters[2] != -1;
+	if (!monstersClose && combat.areMonstersPresent() && party.canShoot()
+			&& _autoShots < AUTO_PLAY_MAX_SHOTS) {
+		++_autoShots;
+		_buttonValue = Common::KEYCODE_s;
+		return;
+	}
+
+	// Count each arrival on a tile, and head for whichever neighbouring tile has been
+	// visited least, preferring to keep going the way the party is facing
+	const uint32 here = ((uint32)party._mazeId << 16) | ((party._mazePosition.x & 0xff) << 8)
+		| (party._mazePosition.y & 0xff);
+	if (party._mazePosition != _autoLastTile) {
+		_autoLastTile = party._mazePosition;
+		_autoVisits[here] = _autoVisits.getValOrDefault(here, 0) + 1;
+		_autoShots = 0;
+	}
+
+	static const int DELTA_X[4] = { 0, 1, 0, -1 }, DELTA_Y[4] = { 1, 0, -1, 0 };
+	const int facing = party._mazeDirection;
+	int bestDir = -1, bestScore = 0;
+
+	for (int dir = 0; dir < 4; ++dir) {
+		if (!autoPlayCanStep((Direction)dir))
+			continue;
+
+		const uint32 there = ((uint32)party._mazeId << 16)
+			| (((party._mazePosition.x + DELTA_X[dir]) & 0xff) << 8)
+			| ((party._mazePosition.y + DELTA_Y[dir]) & 0xff);
+		const int turn = (dir - facing) & 3;
+		const int score = _autoVisits.getValOrDefault(there, 0) * 10 + (turn == 0 ? 0 : (turn == 2 ? 3 : 1));
+
+		if (bestDir == -1 || score < bestScore) {
+			bestDir = dir;
+			bestScore = score;
+		}
+	}
+
+	if (bestDir == -1 || ((bestDir - facing) & 3) != 3)
+		// Step forward if already facing the right way, and otherwise turn right: either
+		// towards the chosen direction, or just to look around when boxed in
+		_buttonValue = (bestDir == facing) ? Common::KEYCODE_UP : Common::KEYCODE_RIGHT;
+	else
+		_buttonValue = Common::KEYCODE_LEFT;
+}
+
+void Interface::autoPlayFight() {
+	Combat &combat = *_vm->_combat;
+	Spells &spells = *_vm->_spells;
+
+	if (!autoPlayPartyOk()) {
+		// Hand the fight back to the player
+		toggleAutoPlay();
+		return;
+	}
+
+	Character &c = *combat._combatParty[combat._whosTurn];
+	bool hasCast = false;
+
+	if (c._currentSpell != -1) {
+		MagicSpell spell = (MagicSpell)Res.SPELLS_ALLOWED[c.getSpellsCategory()][c._currentSpell];
+		if (Spells::isAttackSpell(spell) && spells.canAfford(c, spell))
+			hasCast = spells.castSpell(&c, spell) == 1;
+	}
+
+	if (!hasCast)
+		combat.attack(c, RT_SINGLE);
+	nextChar();
+
+	if (g_vm->_extOptions._showHpSpBars)
+		drawParty(true);
 }
 
 void Interface::chargeStep() {
@@ -1144,7 +1326,8 @@ bool Interface::checkMoveDirection(int key) {
 				return true;
 			}
 
-			sound.playFX(21);
+			if (!_autoProbing)
+				sound.playFX(21);
 			return false;
 
 		case 1:
@@ -1156,7 +1339,8 @@ bool Interface::checkMoveDirection(int key) {
 			if (party.checkSkill(MOUNTAINEER))
 				return true;
 
-			sound.playFX(21);
+			if (!_autoProbing)
+				sound.playFX(21);
 			return false;
 
 		default:
@@ -1169,7 +1353,8 @@ bool Interface::checkMoveDirection(int key) {
 		party._mazeDirection = dir;
 
 		if (surfaceId >= map.mazeData()._difficulties._wallNoPass) {
-			sound.playFX(46);
+			if (!_autoProbing)
+				sound.playFX(46);
 			return false;
 		} else {
 			if (startSurfaceId != SURFTYPE_SWAMP || party.checkSkill(SWIMMING) ||
@@ -1182,7 +1367,8 @@ bool Interface::checkMoveDirection(int key) {
 				}
 				return true;
 			} else {
-				sound.playFX(46);
+				if (!_autoProbing)
+					sound.playFX(46);
 				return false;
 			}
 		}
@@ -1426,7 +1612,9 @@ void Interface::draw3d(bool updateFlag, bool pauseFlag) {
 	}
 
 	if (g_vm->_extOptions._realTime && (_vm->_mode == MODE_INTERACTIVE || _vm->_mode == MODE_COMBAT))
-		windows[3].writeString("""08""l	012010REAL TIMEd", false);
+		windows[3].writeString("\x02\f""08\x03""l\t012\v010REAL TIME\fd\x01", false);
+	if (_autoPlaying && (_vm->_mode == MODE_INTERACTIVE || _vm->_mode == MODE_COMBAT))
+		windows[3].writeString("\x02\f""08\x03""l\t012\v020AUTO PLAY\fd\x01", false);
 
 	if (updateFlag) {
 		windows[1].update();
@@ -1730,6 +1918,7 @@ void Interface::doCombat() {
 
 			// Wait for keypress
 			index = 0;
+			_autoNextTime = g_system->getMillis() + AUTO_PLAY_FIGHT_MS;
 			if (combat._whosTurn != rtWhosTurn) {
 				rtWhosTurn = combat._whosTurn;
 				resetRealTimeTimer();
@@ -1749,6 +1938,10 @@ void Interface::doCombat() {
 					checkEvents(_vm);
 				} while (!_vm->shouldExit() && events.timeElapsed() < 1 && !_buttonValue);
 
+				// Auto-play acts for the character after a short pause
+				if (!_buttonValue && _autoPlaying && g_system->getMillis() >= _autoNextTime)
+					_buttonValue = AUTO_PLAY_ACT;
+
 				// Real-time mode: a character who takes too long loses their go
 				if (!_buttonValue && realTimeElapsed(g_vm->_extOptions._rtCombatMs))
 					_buttonValue = RT_SKIP_TURN;
@@ -1766,6 +1959,14 @@ void Interface::doCombat() {
 			switch (_buttonValue) {
 			case RT_SKIP_TURN:
 				nextChar();
+				break;
+
+			case AUTO_PLAY_ACT:
+				autoPlayFight();
+				break;
+
+			case Common::KEYCODE_p:
+				toggleAutoPlay();
 				break;
 
 			case Common::KEYCODE_RETURN:

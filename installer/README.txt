@@ -57,6 +57,15 @@ Map zoom and drag (MapZoom)
     levels, and dragging with the left button (or the arrow keys) moves the
     view.
 
+Auto-play (AutoPlay)
+    Press P to have the party explore and fight by itself; press P again to
+    take back control. It heads for the tiles it has visited least, keeps off
+    tiles with events on them (shops, stairs, traps) and off dangerous
+    ground, shoots at monsters it can see, and in combat each character casts
+    their ready spell if it is an attack they can afford, and otherwise
+    attacks. It switches itself off when the party is down to about a third
+    of its hit points.
+
 Maximum starting stats (MaxStartStats)
     New characters roll 21 in every attribute.
 

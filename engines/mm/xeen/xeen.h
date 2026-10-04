@@ -124,6 +124,7 @@ class XeenEngine : public MMEngine {
 		bool _tabSwitchesChar;	// Tab steps between characters in dialogs
 		bool _mapNotes;			// Notes can be attached to tiles on the map screen
 		bool _mapZoom;			// The map screen can be zoomed and dragged about
+		bool _autoPlay;			// P lets the game explore and fight by itself
 		bool _maxStartStats;	// New characters get the best possible attribute rolls
 		bool _starterKit;		// New characters get basic equipment for their class
 
@@ -143,6 +144,7 @@ class XeenEngine : public MMEngine {
 			_tabSwitchesChar(false),
 			_mapNotes(false),
 			_mapZoom(false),
+			_autoPlay(false),
 			_maxStartStats(false),
 			_starterKit(false)
 		{}

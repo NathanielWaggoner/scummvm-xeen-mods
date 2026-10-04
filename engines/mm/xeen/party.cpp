@@ -860,12 +860,15 @@ void Party::giveTreasure() {
 	w.update();
 	events.clearEvents();
 
+	// During auto-play the treasure is shown for a moment and then accepted
+	const uint32 autoDismiss = g_system->getMillis() + 1500;
 	do {
 		events.updateGameCounter();
 		intf.draw3d(true);
 
 		events.wait(1, false);
-	} while (!_vm->shouldExit() && !events.isKeyMousePressed());
+	} while (!_vm->shouldExit() && !events.isKeyMousePressed()
+		&& !(intf.isAutoPlaying() && g_system->getMillis() >= autoDismiss));
 	events.clearEvents();
 
 	if (_vm->_mode != MODE_COMBAT)

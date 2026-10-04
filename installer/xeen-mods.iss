@@ -40,6 +40,7 @@ Name: "spaceconfirm"; Description: "Space and Enter confirm prompts"; Types: ful
 Name: "tabswitch"; Description: "Tab switches character in dialogs"; Types: full convenience
 Name: "mapnotes"; Description: "Map notes (click the map to add notes)"; Types: full convenience
 Name: "mapzoom"; Description: "Map zoom and drag"; Types: full convenience
+Name: "autoplay"; Description: "Auto-play (P makes the party explore and fight by itself)"; Types: full
 Name: "maxstats"; Description: "Maximum starting stats for new characters"; Types: full
 Name: "starterkit"; Description: "Starter kit for new characters"; Types: full
 
@@ -205,6 +206,7 @@ begin
   SetMod('TabSwitchesCharacter', 'tabswitch', Ini);
   SetMod('MapNotes', 'mapnotes', Ini);
   SetMod('MapZoom', 'mapzoom', Ini);
+  SetMod('AutoPlay', 'autoplay', Ini);
   SetMod('MaxStartStats', 'maxstats', Ini);
   SetMod('StarterKit', 'starterkit', Ini);
 

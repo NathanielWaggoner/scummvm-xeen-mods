@@ -174,6 +174,59 @@ void Spells::castItemSpell(int itemSpellId) {
 	executeSpell(spells[itemSpellId]);
 }
 
+bool Spells::isAttackSpell(MagicSpell spellId) {
+	switch (spellId) {
+	case MS_AcidSpray:
+	case MS_ColdRay:
+	case MS_DancingSword:
+	case MS_DeadlySwarm:
+	case MS_DragonSleep:
+	case MS_ElementalStorm:
+	case MS_EnergyBlast:
+	case MS_FantasticFreeze:
+	case MS_FieryFlail:
+	case MS_FingerOfDeath:
+	case MS_Fireball:
+	case MS_FlyingFist:
+	case MS_FrostBite:
+	case MS_GolemStopper:
+	case MS_HolyWord:
+	case MS_Implosion:
+	case MS_Incinerate:
+	case MS_Inferno:
+	case MS_InsectSpray:
+	case MS_LightningBolt:
+	case MS_MagicArrow:
+	case MS_MassDistortion:
+	case MS_MegaVolts:
+	case MS_MoonRay:
+	case MS_Pain:
+	case MS_PoisonVolley:
+	case MS_PrismaticLight:
+	case MS_Shrapmetal:
+	case MS_Sleep:
+	case MS_Sparks:
+	case MS_StarBurst:
+	case MS_SunRay:
+	case MS_ToxicCloud:
+	case MS_TurnUndead:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool Spells::canAfford(const Character &c, MagicSpell spellId) const {
+	int gemCost = Res.SPELL_GEM_COST[spellId];
+	int spCost = Res.SPELL_COSTS[spellId];
+
+	// Negative SP costs indicate it's dependent on the character's level
+	if (spCost <= 0)
+		spCost = c.getCurrentLevel() * (spCost * -1);
+
+	return spCost <= c._currentSp && gemCost <= (int)_vm->_party->_gems;
+}
+
 int Spells::castSpell(Character *c, MagicSpell spellId) {
 	Combat &combat = *_vm->_combat;
 	Interface &intf = *_vm->_interface;
