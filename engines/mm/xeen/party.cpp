@@ -388,6 +388,23 @@ void Party::loadActiveParty() {
 	// No implementation needed
 }
 
+void Party::giveStarterKits() {
+	if (!g_vm->_extOptions._starterKit)
+		return;
+
+	for (uint idx = 0; idx < _roster.size(); ++idx) {
+		Character &c = _roster[idx];
+		if (!c._name.empty() && !c._experience && c.hasNoItems())
+			c.giveStarterKit();
+	}
+
+	for (uint idx = 0; idx < _activeParty.size(); ++idx) {
+		Character &c = _activeParty[idx];
+		if (!c._experience && c.hasNoItems())
+			c.giveStarterKit();
+	}
+}
+
 bool Party::checkSkill(Skill skillId) {
 	uint total = 0;
 	for (uint i = 0; i < _activeParty.size(); ++i) {

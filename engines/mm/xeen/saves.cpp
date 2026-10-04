@@ -195,6 +195,7 @@ Common::Error SavesManager::loadGameState(int slot) {
 
 	// Load the character roster and party
 	files._currentSave->loadParty();
+	party.giveStarterKits();
 
 	// Reset any combat information from the previous game
 	combat.reset();

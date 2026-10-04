@@ -698,6 +698,9 @@ bool CreateCharacterDialog::saveCharacter(Character &c, int classId, Race race, 
 	if (raceSkill != -1)
 		c._skills[raceSkill] = 1;
 
+	if (g_vm->_extOptions._starterKit)
+		c.giveStarterKit();
+
 	c._currentHp = c.getMaxHP();
 	c._currentSp = c.getMaxSP();
 	return true;

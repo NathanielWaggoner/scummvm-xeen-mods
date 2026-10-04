@@ -189,6 +189,7 @@ void XeenEngine::loadSettings() {
 
 	_extOptions._qualityOfLife = ConfMan.hasKey("QualityOfLife") && ConfMan.getBool("QualityOfLife");
 	_extOptions._maxStartStats = ConfMan.hasKey("MaxStartStats") && ConfMan.getBool("MaxStartStats");
+	_extOptions._starterKit = ConfMan.hasKey("StarterKit") && ConfMan.getBool("StarterKit");
 	_extOptions._smoothMove = ConfMan.hasKey("SmoothMove") && ConfMan.getBool("SmoothMove");
 	if (ConfMan.hasKey("SmoothMoveTileMs"))
 		_extOptions._glideTileMs = CLIP(ConfMan.getInt("SmoothMoveTileMs"), 60, 2000);
@@ -344,6 +345,22 @@ void XeenEngine::play() {
 		for (int idx = 0; idx < INV_ITEMS_TOTAL; ++idx)
 			count += _party->_activeParty[0]._weapons[idx].empty() ? 0 : 1;
 		debug("Backpack test: %d of 20 weapons survived the reload", count);
+	}
+
+	if (ConfMan.hasKey("TestKit") && ConfMan.getBool("TestKit")) {
+		// Testing aid: report the starter kit each class would be given
+		for (int cls = CLASS_KNIGHT; cls <= CLASS_RANGER; ++cls) {
+			Character c;
+			c._class = (CharacterClass)cls;
+			c.giveStarterKit();
+
+			Common::String kit;
+			for (int idx = 0; idx < INV_PAGE_SIZE && !c._weapons[idx].empty(); ++idx)
+				kit += Common::String::format("%s/ ", Res.WEAPON_NAMES[c._weapons[idx]._id]);
+			for (int idx = 0; idx < INV_PAGE_SIZE && !c._armor[idx].empty(); ++idx)
+				kit += Common::String::format("%s/ ", Res.ARMOR_NAMES[c._armor[idx]._id]);
+			debug("Kit test: %s: %s", Res.CLASS_NAMES[cls], kit.c_str());
+		}
 	}
 
 	if (ConfMan.hasKey("TestCreateChar") && ConfMan.getBool("TestCreateChar")) {
